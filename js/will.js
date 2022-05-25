@@ -4,6 +4,7 @@ const chess = new Chess(
   "rn1qkbnr/p2bp1pp/3p1p2/1pp5/8/8/PPPPPPPP/1RBQKBNR w Kkq c6 0 6"
 );
 
+var logger = document.getElementById("logger");
 o = function (message) {
   if (typeof message == "object") {
     logger.innerHTML +=
@@ -13,33 +14,12 @@ o = function (message) {
   }
 };
 
-// while (!chess.game_over()) {
-// let move = agent == chess.turn() ? evaluate(chess) : baseline(chess)
-// let move = evaluate(chess);
-// chess.move(move);
-// o(chess.fen());
-// o(chess.pgn());
 function evalMove(chess) {
-  o("evalmove");
+  o("--- AI MOVE ---");
   let move = evaluate(chess);
   o(move);
   return move;
 }
-
-// main()
-// test_depth()
-
-function o() {
-  let buffer = "";
-  for (var i = 0; i < arguments.length; i++) {
-    o(arguments[i]);
-  }
-}
-
-// function test_depth() {
-//     const chess = new Chess()
-//     evaluate(chess)
-// }
 
 function main() {
   let games = 0;
