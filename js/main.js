@@ -1,3 +1,5 @@
+// const { evalMove } = require("./will.js");
+
 /*
  * A simple chess AI, by someone who doesn't know how to play chess.
  * Uses the chessboard.js and chess.js libraries.
@@ -5,7 +7,16 @@
  * Copyright (c) 2020 Zhang Zeyu
  */
 
-var STACK_SIZE = 100; // maximum size of undo stack
+// var old = console.log;
+var logger = document.getElementById("logger");
+o = function (message) {
+  if (typeof message == "object") {
+    logger.innerHTML +=
+      (JSON && JSON.stringify ? JSON.stringify(message) : message) + "<br />";
+  } else {
+    logger.innerHTML += message + "<br />";
+  }
+};
 
 var board = null;
 var $board = $("#myBoard");
@@ -30,6 +41,12 @@ function makeRandomMove() {
   board.position(game.fen());
 }
 
+function makeAIMove() {
+  o("make ai move");
+  game.move(evalMove(game));
+  board.position(game.fen());
+}
+
 function onDrop(source, target) {
   // see if the move is legal
   var move = game.move({
@@ -38,11 +55,13 @@ function onDrop(source, target) {
     promotion: "q", // NOTE: always promote to a queen for example simplicity
   });
 
+  move ? o(move) : null;
+
   // illegal move
   if (move === null) return "snapback";
 
   // make random legal move for black
-  window.setTimeout(makeRandomMove, 250);
+  window.setTimeout(makeAIMove, 250);
 }
 
 // update the board position after the piece snap

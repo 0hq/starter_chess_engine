@@ -42,7 +42,8 @@
 
         <!-- Chess JS (slightly modified) -->
         <script defer src="js/chess.js"></script>
-        </script>
+        
+        <script defer src="js/will.js"></script>
 
         <!-- Bootstrap JS --> 
         <script defer
@@ -55,11 +56,19 @@
         <script defer src="js/main.js"></script>
     </head>
     <body>
+        <div style="position: absolute; right: 20px; top: 20px;">
+            <h5>Console Logs</h5>
+        
+        <div style="height: 900px; width: 600px; overflow: auto; border: 2px solid grey; padding: 10px;">
+            <p  id="logger"></p>
+        </div>
+    </div>
+        
         <main>
             <div class="container my-3">
                 <div class="row align-items-center">
                     
-                        <div class="row my-3 text-align-center">
+                        <!-- <div class="row my-3 text-align-center">
                             <div class="col-md-12">
                                 <h2>Advantage</h2>
                                 <p><span id="advantageColor">Neither side</span> has the advantage 
@@ -71,13 +80,13 @@
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                        <div class="row my-3 text-align-center">
+                        </div> -->
+                        <!-- <div class="row my-3 text-align-center">
                             <div class="col-md-12">
                                 <h2>Status</h2>
                                 <p><span id="status">No check, checkmate, or draw.</span></p>
                             </div>
-                        </div>
+                        </div> -->
                     </div>
                     <div class="col-md-6">
                         <div id="myBoard"></div>
