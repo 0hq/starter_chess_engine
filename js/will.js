@@ -1,184 +1,228 @@
 const DEPTH_SEARCH = 3;
-
-const chess = new Chess(
-  "rn1qkbnr/p2bp1pp/3p1p2/1pp5/8/8/PPPPPPPP/1RBQKBNR w Kkq c6 0 6"
-);
-
-var logger = document.getElementById("logger");
-o = function (message) {
-  if (typeof message == "object") {
-    logger.innerHTML +=
-      (JSON && JSON.stringify ? JSON.stringify(message) : message) + "<br />";
-  } else {
-    logger.innerHTML += message + "<br />";
-  }
-};
+const MAX_NEG = -100000000000;
 
 function evalMove(chess) {
-  o("--- AI MOVE ---");
+  o(`(${game.fen().split(" ")[5]}) --- Agent ---`);
   let move = evaluate(chess);
   o(move);
+  o("\n");
   return move;
 }
 
-function main() {
-  let games = 0;
-  let max = 10;
-  let score = [0, 0, 0]; // win draw losses
-  while (games < max + 1) {
-    // o('\n')
-    o(games);
-    // let result = Math.random() > 0.5 ? run_game('w') : run_game('b')
-    let result = run_game("w");
-    score[result] += 1;
-    games++;
-  }
+d = function (message, depth) {
+  return;
+  if (depth == 0) return;
+  console.log(" - ".repeat(DEPTH_SEARCH - depth), message);
+  // console.trace(message);
 
-  o(`Wins: ${score[0]}, Draws: ${score[1]}, Losses: ${score[2]}`);
-}
-
-function run_game(agent) {
-  const chess = new Chess();
-
-  // while (!chess.game_over()) {
-  // let move = agent == chess.turn() ? evaluate(chess) : baseline(chess)
-  let move = evaluate(chess);
-
-  chess.move(move);
-  o(chess.fen());
-  o(chess.pgn());
+  // if (typeof message == "object") {
+  //   logger.innerHTML +=
+  //     (JSON && JSON.stringify ? JSON.stringify(message) : message) + "<br />";
+  // } else {
+  //   logger.innerHTML += message + "<br />";
   // }
-
-  o(chess.pgn());
-
-  if (chess.in_draw() || chess.in_stalemate()) {
-    o("Draw");
-    return 1;
-  }
-
-  if (chess.in_checkmate()) {
-    let loser = chess.turn();
-    o(`${loser} has lost with score: ${get_score(chess)}`);
-    return loser == agent ? 2 : 0;
-  }
-
-  throw "shouldn't be here at the end of run game";
-}
-
-function baseline(chess) {
-  let moves = chess.moves();
-  let random = moves[Math.floor(Math.random() * moves.length)];
-  return random;
-}
+};
 
 // --------------------------- primitive stuff ----------
 
+let nodeCount = 0;
+let startTime = null;
+
 function evaluate(chess) {
   let moves = chess.moves();
-  // return really_dumb_evaluate(moves)
-  let castle = moves.find((m) => m.includes("O-O")); // if not in danger
-  if (castle) return castle;
-
-  return depth_first_start(chess, DEPTH_SEARCH);
+  console.log("All moves", moves);
+  let start = new Date();
+  startTime = start;
+  let result = alphabeta(chess, DEPTH_SEARCH, {});
+  let end = new Date();
+  console.log(`Time taken in secs: ${(end - start) / 1000}`);
+  console.log(chess.fen());
+  console.log(get_score(chess));
+  return result.bestMove;
 }
 
-function good_moves(moves, limit = 10) {
+function good_moves(moves, limit = 25) {
   let checkmate = moves.filter((m) => m.includes("#"));
+  moves = moves.filter((m) => !m.includes("#"));
   let promote = moves.filter((m) => m.includes("="));
-  let castle = moves.filter((m) => m.includes("O-O"));
+  moves = moves.filter((m) => !m.includes("="));
+  // let castle = moves.filter((m) => m.includes("O-O"));
+  // moves = moves.filter((m) => !m.includes("#"))
   let take = moves.filter((m) => m.includes("x"));
+  moves = moves.filter((m) => !m.includes("x"));
   let check = moves.filter((m) => m.includes("+"));
-  let random = [];
-  for (let index = 0; index < 10; index++) {
-    random.push(moves[Math.floor(Math.random() * moves.length)]);
-  }
+  moves = moves.filter((m) => !m.includes("+"));
 
   // o([...checkmate, ...promote, ...castle, ...take, ...random])
-  return [...checkmate, ...promote, ...castle, ...take, ...random].slice(0, 5);
+  // return random;
+  // console.log([...checkmate, ...promote, ...take, ...check, ...moves]);
+  return [...checkmate, ...promote, ...take, ...check, ...moves].slice(0, limit);
 }
 
-function really_dumb_evaluate(moves) {
-  let checkmate = moves.find((m) => m.includes("#"));
-  let promote = moves.find((m) => m.includes("="));
-  let castle = moves.find((m) => m.includes("O-O"));
-  let take = moves.find((m) => m.includes("x"));
-  let check = moves.find((m) => m.includes("+"));
-  let random = moves[Math.floor(Math.random() * moves.length)];
-  if (checkmate) return checkmate;
-  if (promote) return promote;
-  if (castle) return castle;
-  if (take) return take;
-  if (check) return check;
-  return random;
+function prune(moves, gameState) {
+  let result = good_moves(moves, 25);
+  // d(`Starting search with this many moves ${result.length}`, depth);
+  // d("Available moves:", 20);
+  // d(result, 20);
+  return result;
 }
 
-function doubled_isolated_blocked(chess) {}
+function minimax_new(startingState, depth) {
+  if (depth === 0 || moves.length === 0) {
+    return evaluatePosition(startingState);
+  }
 
-function mobility(chess) {
-  return chess.moves().length;
+  if (maximizingPlayer) {
+    let maxEval = -Infinity,
+      bestMove = null; // minimum value, so that anything will be larger
+    for (let index = 0; index < moves.length; index++) {
+      const move = moves[index];
+
+      // evaluate one more down, with the opposite player OR if it's done, just return evaluation
+      let evaluation = minimax_new(newState, depth - 1, false);
+
+      // if this move is better than anything seen before, keep it!
+      if (evaluation > maxEval) {
+        maxEval = evaluation;
+        bestMove = move;
+      }
+    }
+  } else {
+    // if this is the enemy playing, we're looking to minimize!
+    let minEval = Infinity,
+      bestMove = null; // maximum value, so that anything will be smaller
+    for (let index = 0; index < moves.length; index++) {
+      const move = moves[index];
+
+      // evaluate one more down, with the opposite player OR if it's done, just return evaluation
+      let evaluation = minimax_new(newState, depth - 1, true);
+
+      // if this move is better than anything seen before, keep it!
+      if (evaluation < minEval) {
+        minEval = evaluation;
+        bestMove = move;
+      }
+    }
+  }
+}
+
+function alphabeta(gameState, depth, memory, alpha = -Infinity, beta = Infinity, side = -1, isRoot = true) {
+  if (isRoot) nodeCount = 1;
+  else ++nodeCount;
+
+  const terminalEvaluation = gameState.game_over();
+  if (terminalEvaluation == true) {
+    return terminalEvaluation;
+  }
+
+  if (depth === 0) {
+    return get_score(gameState, side);
+  }
+
+  let bestScore = -Infinity,
+    bestMove = null,
+    rootMoves = [];
+  const moves = prune(gameState.moves(), gameState);
+
+  for (let i = 0, len = moves.length; i < len; ++i) {
+    const move = moves[i];
+    const sideChanged = gameState.turn() == "w" ? 1 : -1;
+    const newState = new Chess(gameState.fen());
+    newState.move(move);
+    memory[move] = { frozen_score: get_score(newState, side) };
+    const score = sideChanged * alphabeta(newState, depth - 1, memory[move], sideChanged * alpha, sideChanged * beta, sideChanged * side, false);
+    memory[move]["score"] = score;
+    if (isRoot) {
+      rootMoves.push([move, score]);
+      const avgtime = (new Date() - startTime) / (i + 1) / 1000;
+      const extrapolated = avgtime * (moves.length - i - 1);
+      console.log(`done with ${move} in ${parseInt(avgtime)} secs. `);
+      console.log(`eta in ${parseInt(extrapolated)} secs with ${nodeCount} iterated so far`);
+    }
+    if (score > bestScore) {
+      bestScore = score;
+    }
+    if (bestScore > alpha) {
+      alpha = bestScore;
+      bestMove = move;
+    }
+    // if (alpha >= beta) {
+    //   memory[move]["pruned"] = true;
+    //   break;
+    // }
+  }
+
+  if (isRoot) console.log(memory, rootMoves);
+  return isRoot ? { score: bestScore, bestMove: bestMove, memory: memory } : bestScore;
 }
 
 function depth_first_start(state, depth) {
-  let start = new Date();
-  const moves = good_moves(state.moves(), 15);
-  let max = -1000000000;
+  // const oldstate = new Chess(state.fen());
+  // let simulated;
+  const moves = prune(state.moves(), depth);
+  let max = MAX_NEG;
   let final_move = undefined;
-  // let memory = []
-  o(
-    `${get_score(state)} depth_first_start has this many moves ${moves.length}`
-  );
-  for (let index = 0; index < moves.length; index++) {
-    const move = moves[index];
-    // o("\n New loop for", move, index)
+  let memory = {};
+  let analysis = [];
+
+  for (const move of moves) {
     const simulated = new Chess(state.fen());
     simulated.move(move);
-    let score = -1 * depth_first(simulated, depth - 1);
-    // o(`score for move: ${move}  is ${score}`)
-    // memory.push([score, move])
-    if (score > max) {
-      // o("saving", score, move)
+    d(move, depth - 1);
+    memory[move] = { score: get_score(simulated) };
+    let result = depth_first(simulated, depth - 1, memory[move], -Infinity, Infinity);
+    let score = result * -1;
+    analysis.push([score, move]);
+    console.log("done with move", move);
+    if (score >= max) {
       max = score;
       final_move = move;
     }
   }
-  let end = new Date();
-
-  // o(max, final_move, memory)
-  o((end - start) / 1000);
+  console.log(analysis, depth);
+  console.log(memory, depth);
+  console.log("Choice is: " + final_move, depth);
   return final_move;
 }
 
-function depth_first(state, depth) {
-  if (depth == 0) return get_score(state);
-  const moves = good_moves(state.moves(), 3 + depth);
-  let max = -1000000000;
-  // o(`${depth} depth_first_start has this many moves ${moves.length}`)
-  for (let index = 0; index < moves.length; index++) {
-    const move = moves[index];
-    // o("\n New loop for", move, index)
+function depth_first(state, depth, memory, alpha, beta) {
+  if (depth == 0) {
+    let score = get_score(state);
+    memory["score"] = score;
+    return score;
+  }
+  const moves = prune(state.moves(), depth);
+  let max = -Infinity;
+
+  for (const move of moves) {
     const simulated = new Chess(state.fen());
     simulated.move(move);
-    let score = -1 * depth_first(simulated, depth - 1);
-    // o(`score for move: ${move}  is ${score}`)
-    if (score > max) {
-      // o("saving", score)
-      max = score;
+    d(move, depth - 1);
+    memory[move] = { score: get_score(simulated) };
+    let result = depth_first(simulated, depth - 1, memory[move], -beta, -alpha);
+    let score = -1 * result;
+    if (score > alpha) alpha = score;
+    if (alpha > beta) {
+      memory[move]["pruned"] = "PRUNED";
+      // console.log("PRUNED", move);
+      continue;
     }
+    if (score > max) max = score;
   }
 
-  // o(max)
+  d(memory, depth);
   return max;
 }
 
-function get_score(chess) {
-  // o("get_score")
+function get_score(chess, sideChanged) {
+  // console.log("get_score");
   let text = chess.fen().split(" ")[0].split("");
   let whitescore = 0;
   let blackscore = 0;
   let chars = text.filter((char) => {
     return char.length === 1 && char.match(/[a-z]/i);
   });
-  // o(chars)
+  // console.log(chars);
   for (let index = 0; index < chars.length; index++) {
     const element = chars[index];
     const lower = element.toLowerCase();
@@ -202,24 +246,17 @@ function get_score(chess) {
     }
 
     if (chess.game_over()) points += 200;
-    element == element.toLowerCase()
-      ? (blackscore += points)
-      : (whitescore += points);
+    if (element == element.toLowerCase()) {
+      blackscore += points;
+    } else {
+      whitescore += points;
+    }
   }
-  // o(whitescore, blackscore)
-  // o((whitescore - blackscore) * (chess.turn() == 'w' ? 1 : -1))
-  if (chess.turn() == "w") {
-    whitescore += 0.1 * mobility(chess);
-    let undo = new Chess(chess.fen());
-    undo.undo();
-    blackscore += 0.1 * mobility(undo);
-  } else {
-    blackscore += 0.1 * mobility(chess);
-    let undo = new Chess(chess.fen());
-    undo.undo();
-    whitescore += 0.1 * mobility(undo);
-  }
-  return (whitescore - blackscore) * (chess.turn() == "w" ? 1 : -1);
+  // console.log(whitescore, blackscore);
+  // console.log((whitescore - blackscore) * (chess.turn() == "w" ? 1 : -1));
+  return (whitescore - blackscore) * sideChanged;
+
+  // return (whitescore - blackscore) * (chess.turn() == "w" ? 1 : -1);
 }
 
 function isNumber(char) {
