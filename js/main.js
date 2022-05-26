@@ -1,6 +1,7 @@
 // will's chess ai
 // var fen = "rnbqk1nr/p2pppb1/2p3pp/1p2P3/2BP4/5N2/PPP2PPP/RNBQK2R w KQkq - 1 5";
-var fen = "3b2k1/1p3p2/p1p5/2P4p/1P2P1p1/5p2/5P2/4RK2 w - - 0 1";
+// var fen = "3b2k1/1p3p2/p1p5/2P4p/1P2P1p1/5p2/5P2/4RK2 w - - 0 1";
+var fen = undefined;
 var start = fen ? fen : "start";
 var logger = document.getElementById("logger");
 o = function (message) {
@@ -13,7 +14,7 @@ var game = new Chess(fen);
 // var $aiboard = $("#aiBoard");
 
 var config = {
-  draggable: false,
+  draggable: true,
   position: start,
   onDragStart: onDragStart,
   onDrop: onDrop,
@@ -77,20 +78,20 @@ function makeRandomMove() {
 function makeAIMove() {
   game.move(rewriteEval(game, false));
   board.position(game.fen());
-  window.setTimeout(makeRandomMove, 500);
+  // window.setTimeout(makeRandomMove, 500);
 }
 
 // function makeOtherAIMove() {
 //   game.move(game.moves()[Math.floor(Math.random() * game.moves().length)]);
 // }
 
-function makeAIsPlay(isMax) {
-  if (isMax) makeAIMove();
-  else makeOtherAIMove();
-}
+// function makeAIsPlay(isMax) {
+//   if (isMax) makeAIMove();
+//   else makeOtherAIMove();
+// }
 
 // board.position(game.fen());
-window.setTimeout(makeRandomMove, 500);
+// window.setTimeout(makeRandomMove, 500);
 
 // function makeAIMoveOld() {
 //   game.move(evalMove(game, false));
