@@ -1,5 +1,7 @@
-const DEPTH_SEARCH = 4;
+const DEPTH_SEARCH = 1;
 let startTime = null;
+let nodesExplored = 0;
+let memo = {};
 
 function rewriteEval(chess, isMax = false) {
   o(`(${game.fen().split(" ")[5]}) --- Agent ---`);
@@ -28,6 +30,7 @@ function evaluate(chess, isMax) {
   let moves = chess.moves();
   console.log("All moves", prune(moves, chess));
 
+  nodesExplored = 0;
   let start = new Date();
   startTime = start;
 
@@ -38,6 +41,7 @@ function evaluate(chess, isMax) {
 
   let end = new Date();
   console.log(`Time taken in secs: ${(end - start) / 1000}`);
+  console.log(`Nodes explored is ${nodesExplored}`);
 
   return result[0];
 }
@@ -65,56 +69,8 @@ function prune(moves, gameState) {
   return output.slice(0, 20);
 }
 
-function minimax(startingState, depth, maximizingPlayer) {
-  const moves = startingState.moves();
-  if (depth === 0 || moves.length === 0) {
-    return [null, evaluatePosition(startingState)];
-  }
-
-  if (maximizingPlayer) {
-    let maxEval = -Infinity, // minimum value, so that anything will be larger
-      bestMove = null;
-    for (let index = 0; index < moves.length; index++) {
-      const move = moves[index];
-      startingState.move(move); // simulate the move
-
-      // evaluate one more down, with the opposite player OR if it's done, just return evaluation
-      let [returnedMove, evaluation] = minimax(startingState, depth - 1, false);
-
-      startingState.undo(); // revert the simulated move
-
-      // if this move is better than anything seen before, keep it!
-      if (evaluation > maxEval) {
-        maxEval = evaluation;
-        bestMove = move;
-      }
-    }
-    return [bestMove, maxEval];
-  } else {
-    // if this is the enemy playing, we're looking to minimize!
-    let minEval = Infinity,
-      bestMove = null; // maximum value, so that anything will be smaller
-    for (let index = 0; index < moves.length; index++) {
-      const move = moves[index];
-      startingState.move(move); // simulate the move
-
-      // evaluate one more down, with the opposite player OR if it's done, just return evaluation
-      let [returnedMove, evaluation] = minimax(startingState, depth - 1, true);
-
-      startingState.undo(); // revert the simulated move
-
-      // if this move is better than anything seen before, keep it!
-      if (evaluation < minEval) {
-        minEval = evaluation;
-        bestMove = move;
-      }
-    }
-    return [bestMove, minEval];
-  }
-}
-
 // fixes horizon issue
-function quiesce(startingState, alpha, beta, maximizingPlayer) {
+function quiesce(startingState, maximizingPlayer) {
   let moves = startingState.moves();
   let checkmate = moves.filter((m) => m.includes("#"));
   let take = moves.filter((m) => m.includes("x"));
@@ -122,7 +78,7 @@ function quiesce(startingState, alpha, beta, maximizingPlayer) {
   moves = [...checkmate, ...take, ...promote];
   // console.log(moves);
   if (moves.length == 0) {
-    return [null, evaluatePosition(startingState)];
+    return [null, evaluatePosition(startingState), []];
   } else {
     if (maximizingPlayer) {
       let maxEval = -Infinity, // minimum value, so that anything will be larger
@@ -130,10 +86,9 @@ function quiesce(startingState, alpha, beta, maximizingPlayer) {
       for (let index = 0; index < moves.length; index++) {
         const move = moves[index];
         startingState.move(move); // simulate the move
-        // aiboard.position(startingState.fen());
 
-        // evaluate one more down, with the opposite player OR if it's done, just return evaluation
-        evaluation = evaluatePosition(startingState);
+        // evaluate the position
+        let [returnedMove, evaluation, returnedHistory] = minimaxAlphaBeta(startingState, 0, null, null, null, false);
 
         startingState.undo(); // revert the simulated move
 
@@ -142,14 +97,8 @@ function quiesce(startingState, alpha, beta, maximizingPlayer) {
           maxEval = evaluation;
           bestMove = move;
         }
-        if (evaluation > alpha) {
-          alpha = evaluation;
-        }
-        if (beta <= alpha) {
-          break;
-        }
       }
-      return [bestMove, maxEval];
+      return [bestMove, maxEval, [bestMove + "(q)"]];
     } else {
       // if this is the enemy playing, we're looking to minimize!
       let minEval = Infinity,
@@ -158,8 +107,8 @@ function quiesce(startingState, alpha, beta, maximizingPlayer) {
         const move = moves[index];
         startingState.move(move); // simulate the move
 
-        // evaluate one more down, with the opposite player OR if it's done, just return evaluation
-        evaluation = evaluatePosition(startingState);
+        // evaluate the position
+        let [returnedMove, evaluation, returnedHistory] = minimaxAlphaBeta(startingState, 0, null, null, null, false);
 
         startingState.undo(); // revert the simulated move
 
@@ -168,34 +117,38 @@ function quiesce(startingState, alpha, beta, maximizingPlayer) {
           minEval = evaluation;
           bestMove = move;
         }
-        if (evaluation < beta) {
-          beta = evaluation;
-        }
-        if (alpha <= beta) {
-          break;
-        }
       }
-      return [bestMove, minEval];
+      return [bestMove, minEval, [bestMove + "(q)"]];
     }
   }
 }
 
 function minimaxAlphaBeta(startingState, depth, moves, alpha, beta, maximizingPlayer, isRoot = false) {
   if (depth === 0 || moves.length === 0) {
-    return quiesce(startingState, alpha, beta, maximizingPlayer);
+    let result = quiesce(startingState, maximizingPlayer);
+    // console.log(result);
+    return result;
     return [null, evaluatePosition(startingState)];
   }
 
   if (maximizingPlayer) {
     let maxEval = -Infinity, // minimum value, so that anything will be larger
-      bestMove = null;
+      bestMove = null,
+      history = [];
     for (let index = 0; index < moves.length; index++) {
       const move = moves[index];
       startingState.move(move); // simulate the move
       // aiboard.position(startingState.fen());
 
       // evaluate one more down, with the opposite player OR if it's done, just return evaluation
-      let [returnedMove, evaluation] = minimaxAlphaBeta(startingState, depth - 1, prune(startingState.moves(), startingState), alpha, beta, false);
+      let [returnedMove, evaluation, returnedHistory] = minimaxAlphaBeta(
+        startingState,
+        depth - 1,
+        prune(startingState.moves(), startingState),
+        alpha,
+        beta,
+        false
+      );
 
       startingState.undo(); // revert the simulated move
 
@@ -203,6 +156,7 @@ function minimaxAlphaBeta(startingState, depth, moves, alpha, beta, maximizingPl
       if (evaluation > maxEval) {
         maxEval = evaluation;
         bestMove = move;
+        history = [move, ...returnedHistory];
       }
       if (maxEval > alpha) {
         alpha = maxEval;
@@ -211,28 +165,38 @@ function minimaxAlphaBeta(startingState, depth, moves, alpha, beta, maximizingPl
         break;
       }
     }
-    return [bestMove, maxEval];
+    // console.log([bestMove, maxEval, history]);
+    return [bestMove, maxEval, history];
   } else {
     // if this is the enemy playing, we're looking to minimize!
-    let minEval = Infinity,
-      bestMove = null; // maximum value, so that anything will be smaller
+    let minEval = Infinity, // maximum value, so that anything will be smaller
+      bestMove = null,
+      history = [];
     for (let index = 0; index < moves.length; index++) {
       const move = moves[index];
       startingState.move(move); // simulate the move
 
       // evaluate one more down, with the opposite player OR if it's done, just return evaluation
-      let [returnedMove, evaluation] = minimaxAlphaBeta(startingState, depth - 1, prune(startingState.moves(), startingState), alpha, beta, true);
+      let [returnedMove, evaluation, returnedHistory] = minimaxAlphaBeta(
+        startingState,
+        depth - 1,
+        prune(startingState.moves(), startingState),
+        alpha,
+        beta,
+        true
+      );
 
       startingState.undo(); // revert the simulated move
 
       if (isRoot) {
-        console.log(evaluation, move);
+        console.log(evaluation, move, returnedHistory);
       }
 
       // if this move is better than anything seen before, keep it!
       if (evaluation < minEval) {
         minEval = evaluation;
         bestMove = move;
+        history = [move, ...returnedHistory];
       }
       if (minEval < beta) {
         beta = minEval;
@@ -241,11 +205,13 @@ function minimaxAlphaBeta(startingState, depth, moves, alpha, beta, maximizingPl
         break;
       }
     }
-    return [bestMove, minEval];
+    // console.log([bestMove, minEval, history]);
+    return [bestMove, minEval, history];
   }
 }
 
 function evaluatePosition(chess) {
+  nodesExplored++;
   // console.log("get_score");
   let text = chess.fen().split(" ")[0].split("");
   let whitescore = 0,
