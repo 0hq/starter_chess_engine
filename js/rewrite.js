@@ -1,4 +1,4 @@
-const DEPTH_SEARCH = 1;
+const DEPTH_SEARCH = 3;
 let startTime = null;
 let nodesExplored = 0;
 let memo = {};
@@ -34,8 +34,10 @@ function evaluate(chess, isMax) {
   let start = new Date();
   startTime = start;
 
-  let result = minimaxAlphaBeta(chess, DEPTH_SEARCH, prune(moves, chess), -Infinity, Infinity, isMax, true);
-  console.log(result);
+  let result = minimaxAlphaBeta(chess, DEPTH_SEARCH, prune(moves, chess), -Infinity, Infinity, isMax, memo, true);
+  console.log(result, memo);
+  memo = memo[result[0]];
+  console.log(memo);
   // console.log(chess.fen());
   // console.log(evaluatePosition(chess));
 
@@ -46,49 +48,54 @@ function evaluate(chess, isMax) {
   return result[0];
 }
 
-function prune(moves, gameState) {
-  let checkmate = moves.filter((m) => m.includes("#"));
-  moves = moves.filter((m) => !m.includes("#"));
-  let promote = moves.filter((m) => m.includes("="));
-  moves = moves.filter((m) => !m.includes("="));
-  let take = moves.filter((m) => m.includes("x"));
-  moves = moves.filter((m) => !m.includes("x"));
-  let check = moves.filter((m) => m.includes("+"));
-  moves = moves.filter((m) => !m.includes("+"));
-  let queens = moves.filter((m) => m.includes("Q"));
-  moves = moves.filter((m) => !m.includes("Q"));
-  let rooks = moves.filter((m) => m.includes("R"));
-  moves = moves.filter((m) => !m.includes("R"));
-  let bishops = moves.filter((m) => m.includes("B"));
-  moves = moves.filter((m) => !m.includes("B"));
-  let knights = moves.filter((m) => m.includes("N"));
-  moves = moves.filter((m) => !m.includes("N"));
-  // console.log(checkmate, promote, take, check, queens, rooks, bishops, knights, moves);
-  // console.log(checkmate.concat(promote, take, check, queens, rooks, bishops, knights, moves))
-  let output = checkmate.concat(promote, take, check, queens, rooks, bishops, knights, moves);
-  return output.slice(0, 20);
+function evaluate_move(board, move) {
+  if (m.includes("#")) return Infinity;
+  if (m.includes("=")) return 1000;
+}
+
+function prune(gameState) {
+  let moves = startingState.moves({ verbose: true });
+  let evaluated = [];
+  for (let i = 0; i < moves.length; i++) {
+    const move = moves[i];
+    evaluated[i] = evaluate_move(gameState, move);
+  }
+
+  evaluated.sort((a, b) => {
+    b.score - a.score;
+  });
+
+  return evaluated;
 }
 
 // fixes horizon issue
-function quiesce(startingState, maximizingPlayer) {
-  let moves = startingState.moves();
+function quiesce(startingState, maximizingPlayer, alpha, beta, depth) {
+  let moves = startingState.moves({ verbose: true });
   let checkmate = moves.filter((m) => m.includes("#"));
   let take = moves.filter((m) => m.includes("x"));
   let promote = moves.filter((m) => m.includes("="));
   moves = [...checkmate, ...take, ...promote];
-  // console.log(moves);
+  let board_value = evaluatePosition(startingState);
   if (moves.length == 0) {
-    return [null, evaluatePosition(startingState), []];
+    return [null, board_value, []];
   } else {
+    // console.log("moves", moves);
+    // console.log(startingState.ascii());
+
+    // console.log("moves and value", moves, board_value);
+
+    // console.log("x".repeat(DEPTH_SEARCH - depth));
     if (maximizingPlayer) {
       let maxEval = -Infinity, // minimum value, so that anything will be larger
-        bestMove = null;
+        bestMove = null,
+        history = [];
       for (let index = 0; index < moves.length; index++) {
         const move = moves[index];
         startingState.move(move); // simulate the move
 
         // evaluate the position
-        let [returnedMove, evaluation, returnedHistory] = minimaxAlphaBeta(startingState, 0, null, null, null, false);
+        // console.log("(q) searching down one more with move", move);
+        let [returnedMove, evaluation, returnedHistory] = minimaxAlphaBeta(startingState, depth - 1, null, alpha, beta, false);
 
         startingState.undo(); // revert the simulated move
 
@@ -96,19 +103,30 @@ function quiesce(startingState, maximizingPlayer) {
         if (evaluation > maxEval) {
           maxEval = evaluation;
           bestMove = move;
+          history = [move + "(q)", ...returnedHistory];
+        }
+        if (maxEval > alpha) {
+          alpha = maxEval;
+        }
+        if (alpha >= beta) {
+          break;
         }
       }
-      return [bestMove, maxEval, [bestMove + "(q)"]];
+      // console.log("wrapped one layer (white)", maxEval, bestMove, board_value, history);
+      if (maxEval >= board_value) return [bestMove, maxEval, history];
+      else return [null, board_value, []];
     } else {
       // if this is the enemy playing, we're looking to minimize!
       let minEval = Infinity,
-        bestMove = null; // maximum value, so that anything will be smaller
+        bestMove = null,
+        history = []; // maximum value, so that anything will be smaller
       for (let index = 0; index < moves.length; index++) {
         const move = moves[index];
         startingState.move(move); // simulate the move
 
         // evaluate the position
-        let [returnedMove, evaluation, returnedHistory] = minimaxAlphaBeta(startingState, 0, null, null, null, false);
+        // console.log("(q) searching down one more with move", move);
+        let [returnedMove, evaluation, returnedHistory] = minimaxAlphaBeta(startingState, 0, null, alpha, beta, true);
 
         startingState.undo(); // revert the simulated move
 
@@ -116,43 +134,55 @@ function quiesce(startingState, maximizingPlayer) {
         if (evaluation < minEval) {
           minEval = evaluation;
           bestMove = move;
+          history = [move + "(q)", ...returnedHistory];
+        }
+        if (minEval < beta) {
+          beta = minEval;
+        }
+        if (beta <= alpha) {
+          break;
         }
       }
-      return [bestMove, minEval, [bestMove + "(q)"]];
+
+      // console.log("wrapped one layer (black)", minEval, bestMove, board_value, history);
+      if (minEval <= board_value) return [bestMove, minEval, history];
+      else return [null, board_value, []];
     }
   }
 }
 
-function minimaxAlphaBeta(startingState, depth, moves, alpha, beta, maximizingPlayer, isRoot = false) {
-  if (depth === 0 || moves.length === 0) {
-    let result = quiesce(startingState, maximizingPlayer);
-    // console.log(result);
+function minimaxAlphaBeta(startingState, depth, moves, alpha, beta, maximizingPlayer, tree, isRoot = false) {
+  if (depth <= 0 || moves.length === 0) {
+    tree["end"] = true;
+    return [null, evaluatePosition(startingState), []];
+    // console.log("quiesce", maximizingPlayer, startingState.ascii());
+    let result = quiesce(startingState, maximizingPlayer, alpha, beta, depth);
+    // console.log("quiesce done", nodes);
     return result;
     return [null, evaluatePosition(startingState)];
   }
+  console.log("-".repeat(DEPTH_SEARCH - depth));
 
   if (maximizingPlayer) {
     let maxEval = -Infinity, // minimum value, so that anything will be larger
       bestMove = null,
       history = [];
     for (let index = 0; index < moves.length; index++) {
-      const move = moves[index];
+      let move;
+      if (memo[startingState.fen()]) {
+      } else {
+        move = moves[index];
+      }
       startingState.move(move); // simulate the move
       // aiboard.position(startingState.fen());
-
+      tree[move] = {};
       // evaluate one more down, with the opposite player OR if it's done, just return evaluation
-      let [returnedMove, evaluation, returnedHistory] = minimaxAlphaBeta(
-        startingState,
-        depth - 1,
-        prune(startingState.moves(), startingState),
-        alpha,
-        beta,
-        false
-      );
+      let [returnedMove, evaluation, returnedHistory] = minimaxAlphaBeta(startingState, depth - 1, prune(startingState), alpha, beta, false, tree[move]);
 
       startingState.undo(); // revert the simulated move
 
       // if this move is better than anything seen before, keep it!
+      tree[move]["norm"] = evaluatePosition(startingState);
       if (evaluation > maxEval) {
         maxEval = evaluation;
         bestMove = move;
@@ -161,7 +191,8 @@ function minimaxAlphaBeta(startingState, depth, moves, alpha, beta, maximizingPl
       if (maxEval > alpha) {
         alpha = maxEval;
       }
-      if (maxEval >= beta) {
+      if (alpha >= beta) {
+        tree[move]["pruned"] = true;
         break;
       }
     }
@@ -176,22 +207,19 @@ function minimaxAlphaBeta(startingState, depth, moves, alpha, beta, maximizingPl
       const move = moves[index];
       startingState.move(move); // simulate the move
 
+      tree[move] = {};
       // evaluate one more down, with the opposite player OR if it's done, just return evaluation
-      let [returnedMove, evaluation, returnedHistory] = minimaxAlphaBeta(
-        startingState,
-        depth - 1,
-        prune(startingState.moves(), startingState),
-        alpha,
-        beta,
-        true
-      );
+      let [returnedMove, evaluation, returnedHistory] = minimaxAlphaBeta(startingState, depth - 1, prune(startingState), alpha, beta, true, tree[move]);
 
       startingState.undo(); // revert the simulated move
 
       if (isRoot) {
-        console.log(evaluation, move, returnedHistory);
+        console.log("root move done:", evaluation);
+        console.log(move, returnedHistory);
+        console.log(tree);
       }
 
+      tree[move]["norm"] = evaluatePosition(startingState);
       // if this move is better than anything seen before, keep it!
       if (evaluation < minEval) {
         minEval = evaluation;
@@ -201,7 +229,8 @@ function minimaxAlphaBeta(startingState, depth, moves, alpha, beta, maximizingPl
       if (minEval < beta) {
         beta = minEval;
       }
-      if (minEval <= alpha) {
+      if (beta <= alpha) {
+        tree[move]["pruned"] = true;
         break;
       }
     }
@@ -262,7 +291,37 @@ function mobility(chess) {
   return chess.moves().length;
 }
 
-if (typeof define !== "undefined")
-  define(function () {
-    return evalMove;
-  });
+// let checkmate = moves.filter((m) => m.includes("#"));
+// moves = moves.filter((m) => !m.includes("#"));
+// let promote = moves.filter((m) => m.includes("="));
+// moves = moves.filter((m) => !m.includes("="));
+// let take = moves.filter((m) => m.includes("x"));
+// moves = moves.filter((m) => !m.includes("x"));
+// let check = moves.filter((m) => m.includes("+"));
+// moves = moves.filter((m) => !m.includes("+"));
+// let queens = moves.filter((m) => m.includes("Q"));
+// moves = moves.filter((m) => !m.includes("Q"));
+// let rooks = moves.filter((m) => m.includes("R"));
+// moves = moves.filter((m) => !m.includes("R"));
+// let bishops = moves.filter((m) => m.includes("B"));
+// moves = moves.filter((m) => !m.includes("B"));
+// let knights = moves.filter((m) => m.includes("N"));
+// moves = moves.filter((m) => !m.includes("N"));
+// // console.log(checkmate, promote, take, check, queens, rooks, bishops, knights, moves);
+// // console.log(checkmate.concat(promote, take, check, queens, rooks, bishops, knights, moves))
+// let output = checkmate.concat(promote, take, check, queens, rooks, bishops, knights, moves);
+// // output.sort(function (a, b) {
+// //   return 0.5 - Math.random();
+// // });
+// // output.sort((a, b) => {
+// //   if (!memo[a] && !memo[b]) {
+// //     return 0;
+// //   } else if (memo[a] && !memo[b]) {
+// //     return -1;
+// //   } else if (!memo[a] && memo[b]) {
+// //     return 1;
+// //   } else {
+// //     return memo[a] - memo[b];
+// //   }
+// // });
+// // console.log(output, memo);
