@@ -1,9 +1,10 @@
 const DEPTH_SEARCH = 4;
 let startTime = null;
 let nodesExplored = 0;
+let rootHistory = [];
 // let memo = {};
 
-var weights = { p: 100, n: 280, b: 320, r: 479, q: 929, k: 60000, k_e: 60000 };
+var weights = { p: 100, n: 280, b: 320, r: 479, q: 929, k: 60000 };
 var pst_w = {
   p: [
     [100, 100, 100, 100, 105, 100, 100, 100],
@@ -90,8 +91,9 @@ var pst_b = {
 
 function rewriteEval(chess, isMax = false) {
   o(`(${game.fen().split(" ")[5]}) --- Agent ---`);
+  rootHistory = [];
   let move = evaluate(chess, isMax);
-  o(move);
+  o(move.san);
   o("\n");
   return move;
 }
@@ -113,17 +115,21 @@ function sleep(milliseconds) {
 
 function evaluate(chess, isMax) {
   let moves = chess.moves();
-  console.log("All moves", prune(chess, true));
+  console.log("All moves", prune(chess, false, true));
 
   nodesExplored = 0;
   let start = new Date();
   startTime = start;
 
-  let result = minimaxAlphaBeta(chess, DEPTH_SEARCH, prune(chess), -Infinity, Infinity, isMax, true);
-  // console.log(result, memo);
+  let result = minimaxAlphaBeta(chess, DEPTH_SEARCH, -Infinity, Infinity, isMax, evaluatePositionState(chess), true);
+  console.log(result);
+  rootHistory.sort((a, b) => {
+    return b[1] - a[1];
+  });
+  console.log(rootHistory);
   // memo = memo[result[0]];
   // console.log(memo);
-  // console.log(chess.fen());
+  console.log(chess.fen());
   // console.log(evaluatePosition(chess));
 
   let end = new Date();
@@ -166,20 +172,15 @@ function evaluate_capture(board, move) {
   return weights[move["captured"]] - weights[move["piece"]];
 }
 
-function prune(gameState, doPrint = false) {
-  let moves = gameState.moves({ verbose: true });
+function prune(gameState, isMax, doPrint = false) {
+  const flip = isMax ? 1 : -1;
+  const moves = gameState.moves({ verbose: true });
   let evaluated = [];
-  for (let i = 0; i < moves.length; i++) {
-    const move = moves[i];
-    evaluated.push(evaluate_move(gameState, move));
-  }
-
-  evaluated.sort((a, b) => {
-    return b[1] - a[1];
-  });
-  evaluated = evaluated.filter((x) => {
-    return x[1] > -10;
-  });
+  for (let i = 0; i < moves.length; i++) evaluated.push(evaluate_move(gameState, moves[i]));
+  evaluated.sort((a, b) => (b[1] - a[1]) * flip);
+  // evaluated = evaluated.filter((x) => {
+  //   return x[1] > -10;
+  // });
   let map = evaluated.map((x) => x[0]);
   let filtered = map.filter((word) => word);
   if (doPrint) {
@@ -271,84 +272,57 @@ function quiesce(startingState, maximizingPlayer, alpha, beta, depth) {
   }
 }
 
-function minimaxAlphaBeta(startingState, depth, moves, alpha, beta, maximizingPlayer, isRoot = false) {
-  if (depth <= 0 || moves.length === 0) {
-    return [null, evaluatePosition(startingState), []];
-    // console.log("quiesce", maximizingPlayer, startingState.ascii());
-    let result = quiesce(startingState, maximizingPlayer, alpha, beta, depth);
-    // console.log("quiesce done", nodes);
-    return result;
-    return [null, evaluatePosition(startingState)];
-  }
-  // console.log("-".repeat(DEPTH_SEARCH - depth));
-
-  if (maximizingPlayer) {
-    let maxEval = -Infinity, // minimum value, so that anything will be larger
-      bestMove = null,
-      history = [];
-    for (let index = 0; index < moves.length; index++) {
-      let move = moves[index];
-      startingState.move(move); // simulate the move
-      // aiboard.position(startingState.fen());
-      // evaluate one more down, with the opposite player OR if it's done, just return evaluation
-      let [returnedMove, evaluation, returnedHistory] = minimaxAlphaBeta(startingState, depth - 1, prune(startingState), alpha, beta, false);
-
-      startingState.undo(); // revert the simulated move
-
-      // if this move is better than anything seen before, keep it!
-      if (evaluation > maxEval) {
-        maxEval = evaluation;
-        bestMove = move;
-        history = [move, ...returnedHistory];
+function minimaxAlphaBeta(game, depth, alpha, beta, isMax, sum, isRoot = false) {
+  nodesExplored++;
+  const moves = prune(game, isMax);
+  let eval,
+    history = [],
+    bestMove = null;
+  if (depth <= 0 || moves.length === 0) return [null, sum, []];
+  if (isMax) {
+    eval = -Infinity;
+    for (let i = 0; i < moves.length; i++) {
+      let move = moves[i];
+      let moved = game.move(move, { verbose: true }); // simulate the move
+      var newSum = evaluatePosition(game, moved, sum);
+      let [r, evaluation, rHist] = minimaxAlphaBeta(game, depth - 1, alpha, beta, !isMax, newSum);
+      game.undo(); // revert the simulated move
+      if (evaluation > eval) {
+        eval = evaluation;
+        bestMove = moved;
+        history = [moved.san, ...rHist];
       }
-      if (maxEval > alpha) {
-        alpha = maxEval;
-      }
-      if (alpha >= beta) {
-        break;
-      }
+      if (eval > alpha) alpha = eval;
+      if (alpha >= beta) break;
     }
-    // console.log([bestMove, maxEval, history]);
-    return [bestMove, maxEval, history];
   } else {
-    // if this is the enemy playing, we're looking to minimize!
-    let minEval = Infinity, // maximum value, so that anything will be smaller
-      bestMove = null,
-      history = [];
-    for (let index = 0; index < moves.length; index++) {
-      const move = moves[index];
-      startingState.move(move); // simulate the move
-
-      // evaluate one more down, with the opposite player OR if it's done, just return evaluation
-      let [returnedMove, evaluation, returnedHistory] = minimaxAlphaBeta(startingState, depth - 1, prune(startingState), alpha, beta, true);
-
-      startingState.undo(); // revert the simulated move
-
+    eval = Infinity;
+    for (let i = 0; i < moves.length; i++) {
+      let move = moves[i];
+      let moved = game.move(move, { verbose: true });
+      var newSum = evaluatePosition(game, moved, sum);
+      let [r, evaluation, rHist] = minimaxAlphaBeta(game, depth - 1, alpha, beta, !isMax, newSum);
+      game.undo();
+      if (evaluation < eval) {
+        eval = evaluation;
+        bestMove = moved;
+        history = [moved.san, ...rHist];
+      }
+      if (eval < beta) beta = eval;
+      if (beta <= alpha) break;
       if (isRoot) {
         console.log("root move done:", evaluation);
-        console.log(move, returnedHistory);
-      }
-
-      // if this move is better than anything seen before, keep it!
-      if (evaluation < minEval) {
-        minEval = evaluation;
-        bestMove = move;
-        history = [move, ...returnedHistory];
-      }
-      if (minEval < beta) {
-        beta = minEval;
-      }
-      if (beta <= alpha) {
-        break;
+        console.log(moved.san, rHist);
+        rootHistory.push([moved.san, evaluation]);
       }
     }
-    // console.log([bestMove, minEval, history]);
-    return [bestMove, minEval, history];
   }
+  return [bestMove, eval, history];
 }
 
-function evaluatePosition(chess, score, move) {
+function evaluatePosition(chess, move, score) {
   let flip, position, positionOpponent;
+  // console.log(chess, score, move);
   if (move.color === "w") {
     flip = 1;
     position = pst_w;
@@ -374,25 +348,78 @@ function evaluatePosition(chess, score, move) {
     }
   }
 
-  var from = [8 - parseInt(move.from[1]), move.from.charCodeAt(0) - "a".charCodeAt(0)];
-  var to = [8 - parseInt(move.to[1]), move.to.charCodeAt(0) - "a".charCodeAt(0)];
+  var from = [8 - parseInt(move["from"][1]), move["from"].charCodeAt(0) - "a".charCodeAt(0)];
+  var to = [8 - parseInt(move["to"][1]), move["to"].charCodeAt(0) - "a".charCodeAt(0)];
 
   if ("captured" in move) {
-    prevSum += flip * (weights[move.captured] + positionOpponent[move.captured][to[0]][to[1]]);
+    score += flip * (weights[move.captured] + positionOpponent[move.captured][to[0]][to[1]]);
   }
 
   if (move.flags.includes("p")) {
     // if promotion
     move.promotion = "q";
-    prevSum -= flip * (weights[move.piece] + position[move.piece][from[0]][from[1]]);
-    prevSum += flip * (weights[move.promotion] + position[move.promotion][to[0]][to[1]]);
+    score -= flip * (weights[move.piece] + position[move.piece][from[0]][from[1]]);
+    score += flip * (weights[move.promotion] + position[move.promotion][to[0]][to[1]]);
   } else {
     // normal move
-    score -= flip * position[move.color][move.piece][from[0]][from[1]];
-    score += flip * position[move.color][move.piece][to[0]][to[1]];
+    score -= flip * position[move.piece][from[0]][from[1]];
+    score += flip * position[move.piece][to[0]][to[1]];
   }
 
   return score;
+}
+
+// let checkmate = moves.filter((m) => m.includes("#"));
+// moves = moves.filter((m) => !m.includes("#"));
+// let promote = moves.filter((m) => m.includes("="));
+// moves = moves.filter((m) => !m.includes("="));
+// let take = moves.filter((m) => m.includes("x"));
+// moves = moves.filter((m) => !m.includes("x"));
+// let check = moves.filter((m) => m.includes("+"));
+// moves = moves.filter((m) => !m.includes("+"));
+// let queens = moves.filter((m) => m.includes("Q"));
+// moves = moves.filter((m) => !m.includes("Q"));
+// let rooks = moves.filter((m) => m.includes("R"));
+// moves = moves.filter((m) => !m.includes("R"));
+// let bishops = moves.filter((m) => m.includes("B"));
+// moves = moves.filter((m) => !m.includes("B"));
+// let knights = moves.filter((m) => m.includes("N"));
+// moves = moves.filter((m) => !m.includes("N"));
+// // console.log(checkmate, promote, take, check, queens, rooks, bishops, knights, moves);
+// // console.log(checkmate.concat(promote, take, check, queens, rooks, bishops, knights, moves))
+// let output = checkmate.concat(promote, take, check, queens, rooks, bishops, knights, moves);
+// // output.sort(function (a, b) {
+// //   return 0.5 - Math.random();
+// // });
+// // output.sort((a, b) => {
+// //   if (!memo[a] && !memo[b]) {
+// //     return 0;
+// //   } else if (memo[a] && !memo[b]) {
+// //     return -1;
+// //   } else if (!memo[a] && memo[b]) {
+// //     return 1;
+// //   } else {
+// //     return memo[a] - memo[b];
+// //   }
+// // });
+// // console.log(output, memo);
+
+function evaluatePositionState(chess) {
+  let text = chess.fen().split(" ")[0].split("");
+  let whitescore = 0,
+    blackscore = 0;
+  let chars = text.filter((char) => {
+    return char.length === 1 && char.match(/[a-z]/i);
+  });
+  // console.log(chars);
+  for (let index = 0; index < chars.length; index++) {
+    const element = chars[index];
+    const lower = element.toLowerCase();
+    let points = 0;
+    points = weights[lower];
+    element == lower ? (blackscore += points) : (whitescore += points);
+  }
+  return whitescore - blackscore;
 }
 
 function evaluatePositionOld(chess) {
@@ -448,63 +475,78 @@ function mobility(chess) {
   return chess.moves().length;
 }
 
-function piece_value(element) {
-  const lower = element.toLowerCase();
-  let points = 0;
-  switch (lower) {
-    case "r":
-      points = 5;
-      break;
-    case "n":
-      points = 3;
-      break;
-    case "b":
-      points = 3;
-      break;
-    case "q":
-      points = 9;
-      break;
-    case "p":
-      points = 1;
-      break;
-    case "k":
-      points = 1000;
-      break;
-  }
-  return points;
-}
+// function minimaxAlphaBetaOld(startingState, depth, moves, alpha, beta, maximizingPlayer, isRoot = false) {
+//   if (depth <= 0 || moves.length === 0) {
+//     return [null, evaluatePosition(startingState), []];
+//     // console.log("quiesce", maximizingPlayer, startingState.ascii());
+//     let result = quiesce(startingState, maximizingPlayer, alpha, beta, depth);
+//     // console.log("quiesce done", nodes);
+//     return result;
+//     return [null, evaluatePosition(startingState)];
+//   }
+//   // console.log("-".repeat(DEPTH_SEARCH - depth));
 
-// let checkmate = moves.filter((m) => m.includes("#"));
-// moves = moves.filter((m) => !m.includes("#"));
-// let promote = moves.filter((m) => m.includes("="));
-// moves = moves.filter((m) => !m.includes("="));
-// let take = moves.filter((m) => m.includes("x"));
-// moves = moves.filter((m) => !m.includes("x"));
-// let check = moves.filter((m) => m.includes("+"));
-// moves = moves.filter((m) => !m.includes("+"));
-// let queens = moves.filter((m) => m.includes("Q"));
-// moves = moves.filter((m) => !m.includes("Q"));
-// let rooks = moves.filter((m) => m.includes("R"));
-// moves = moves.filter((m) => !m.includes("R"));
-// let bishops = moves.filter((m) => m.includes("B"));
-// moves = moves.filter((m) => !m.includes("B"));
-// let knights = moves.filter((m) => m.includes("N"));
-// moves = moves.filter((m) => !m.includes("N"));
-// // console.log(checkmate, promote, take, check, queens, rooks, bishops, knights, moves);
-// // console.log(checkmate.concat(promote, take, check, queens, rooks, bishops, knights, moves))
-// let output = checkmate.concat(promote, take, check, queens, rooks, bishops, knights, moves);
-// // output.sort(function (a, b) {
-// //   return 0.5 - Math.random();
-// // });
-// // output.sort((a, b) => {
-// //   if (!memo[a] && !memo[b]) {
-// //     return 0;
-// //   } else if (memo[a] && !memo[b]) {
-// //     return -1;
-// //   } else if (!memo[a] && memo[b]) {
-// //     return 1;
-// //   } else {
-// //     return memo[a] - memo[b];
-// //   }
-// // });
-// // console.log(output, memo);
+//   if (maximizingPlayer) {
+//     let maxEval = -Infinity, // minimum value, so that anything will be larger
+//       bestMove = null,
+//       history = [];
+//     for (let index = 0; index < moves.length; index++) {
+//       let move = moves[index];
+//       startingState.move(move); // simulate the move
+//       // aiboard.position(startingState.fen());
+//       // evaluate one more down, with the opposite player OR if it's done, just return evaluation
+//       let [returnedMove, evaluation, returnedHistory] = minimaxAlphaBeta(startingState, depth - 1, prune(startingState), alpha, beta, false);
+
+//       startingState.undo(); // revert the simulated move
+
+//       // if this move is better than anything seen before, keep it!
+//       if (evaluation > maxEval) {
+//         maxEval = evaluation;
+//         bestMove = move;
+//         history = [move, ...returnedHistory];
+//       }
+//       if (maxEval > alpha) {
+//         alpha = maxEval;
+//       }
+//       if (alpha >= beta) {
+//         break;
+//       }
+//     }
+//     // console.log([bestMove, maxEval, history]);
+//     return [bestMove, maxEval, history];
+//   } else {
+//     // if this is the enemy playing, we're looking to minimize!
+//     let minEval = Infinity, // maximum value, so that anything will be smaller
+//       bestMove = null,
+//       history = [];
+//     for (let index = 0; index < moves.length; index++) {
+//       const move = moves[index];
+//       startingState.move(move); // simulate the move
+
+//       // evaluate one more down, with the opposite player OR if it's done, just return evaluation
+//       let [returnedMove, evaluation, returnedHistory] = minimaxAlphaBeta(startingState, depth - 1, prune(startingState), alpha, beta, true);
+
+//       startingState.undo(); // revert the simulated move
+
+//       if (isRoot) {
+//         console.log("root move done:", evaluation);
+//         console.log(move, returnedHistory);
+//       }
+
+//       // if this move is better than anything seen before, keep it!
+//       if (evaluation < minEval) {
+//         minEval = evaluation;
+//         bestMove = move;
+//         history = [move, ...returnedHistory];
+//       }
+//       if (minEval < beta) {
+//         beta = minEval;
+//       }
+//       if (beta <= alpha) {
+//         break;
+//       }
+//     }
+//     // console.log([bestMove, minEval, history]);
+//     return [bestMove, minEval, history];
+//   }
+// }
