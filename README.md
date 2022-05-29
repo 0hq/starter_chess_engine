@@ -2,6 +2,8 @@
 
 logic files held in js/rewrite.js and the version i wrote in 4 hours for a competition is js/will.js
 
+Quiescence search has been removed temporarily so it kind of sucks.
+
 - [x] Depth-first search.  
 - [x] Alpha/beta pruning.  
 - [x] Move ordering.  
