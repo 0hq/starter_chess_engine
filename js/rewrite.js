@@ -141,6 +141,7 @@ function evaluate_move(board, move) {
   if (move.san.includes("x")) capture = evaluate_capture(board, move);
 
   let isMax = move["color"] == "w";
+
   let from = evaluate_piece(move.piece, move["from"][0], move["from"][1], isMax);
   let to = evaluate_piece(move.piece, move["to"][0], move["to"][1], isMax);
   let position = to - from;
@@ -152,12 +153,12 @@ function evaluate_move(board, move) {
 
 function evaluate_piece(element, xL, yX, isMax) {
   let x = xL.charCodeAt(0) - 97;
-  let y = parseInt(yX) - 1;
+  let y = 8 - parseInt(yX);
   // console.log(element, xL, x, yX, y, isMax);
   if (isMax) {
-    return pst_w[element][x][y];
+    return pst_w[element][y][x];
   } else {
-    return pst_b[element][x][y];
+    return pst_b[element][y][x];
   }
 }
 
@@ -346,9 +347,58 @@ function minimaxAlphaBeta(startingState, depth, moves, alpha, beta, maximizingPl
   }
 }
 
-function evaluatePosition(chess) {
+function evaluatePosition(chess, score, move) {
+  let flip, position, positionOpponent;
+  if (move.color === "w") {
+    flip = 1;
+    position = pst_w;
+    positionOpponent = pst_b;
+  } else {
+    flip = -1;
+    position = pst_b;
+    positionOpponent = pst_w;
+  }
+  if (chess.in_checkmate()) {
+    return 10 ** 10 * flip;
+  }
+
+  if (game.in_draw() || game.in_threefold_repetition() || game.in_stalemate()) {
+    return 0;
+  }
+
+  if (game.in_check()) {
+    if (move.color === "w") {
+      score += 50;
+    } else {
+      score -= 50;
+    }
+  }
+
+  var from = [8 - parseInt(move.from[1]), move.from.charCodeAt(0) - "a".charCodeAt(0)];
+  var to = [8 - parseInt(move.to[1]), move.to.charCodeAt(0) - "a".charCodeAt(0)];
+
+  if ("captured" in move) {
+    prevSum += flip * (weights[move.captured] + positionOpponent[move.captured][to[0]][to[1]]);
+  }
+
+  if (move.flags.includes("p")) {
+    // if promotion
+    move.promotion = "q";
+    prevSum -= flip * (weights[move.piece] + position[move.piece][from[0]][from[1]]);
+    prevSum += flip * (weights[move.promotion] + position[move.promotion][to[0]][to[1]]);
+  } else {
+    // normal move
+    score -= flip * position[move.color][move.piece][from[0]][from[1]];
+    score += flip * position[move.color][move.piece][to[0]][to[1]];
+  }
+
+  return score;
+}
+
+function evaluatePositionOld(chess) {
   nodesExplored++;
   // console.log("get_score");
+
   let text = chess.fen().split(" ")[0].split("");
   let whitescore = 0,
     blackscore = 0;
