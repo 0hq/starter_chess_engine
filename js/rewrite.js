@@ -98,24 +98,10 @@ function rewriteEval(chess, isMax = false) {
   return move;
 }
 
-d = function (message, depth) {
-  if (depth == 0) return;
-  console.log(" - ".repeat(DEPTH_SEARCH - depth), message);
-};
-
-function sleep(milliseconds) {
-  const date = Date.now();
-  let currentDate = null;
-  do {
-    currentDate = Date.now();
-  } while (currentDate - date < milliseconds);
-}
-
-// --------------------------- primitive stuff ----------
-
 function evaluate(chess, isMax) {
   let moves = chess.moves();
   console.log("All moves", prune(chess, false, true));
+  console.log("");
 
   nodesExplored = 0;
   let start = new Date();
@@ -139,21 +125,51 @@ function evaluate(chess, isMax) {
   return result[0];
 }
 
-function evaluate_move(board, move) {
+d = function (message, depth) {
+  if (depth == 0) return;
+  console.log(" - ".repeat(DEPTH_SEARCH - depth), message);
+};
+
+function sleep(milliseconds) {
+  const date = Date.now();
+  let currentDate = null;
+  do {
+    currentDate = Date.now();
+  } while (currentDate - date < milliseconds);
+}
+
+// --------------------------- primitive stuff ----------
+
+function prune(gameState, isMax, doPrint = false) {
+  const moves = gameState.moves({ verbose: true });
+  let evaluated = [];
+  for (let i = 0; i < moves.length; i++) evaluated.push(evaluate_move(gameState, moves[i], isMax));
+  evaluated.sort((a, b) => b[1] - a[1]);
+  // evaluated = evaluated.filter((x) => {
+  //   return x[1] > -10;
+  // });
+  // if (isMax) evaluated.reverse();
+  let map = evaluated.map((x) => x[0]);
+  let filtered = map.filter((word) => word);
+  if (doPrint) {
+    console.log(evaluated, isMax, filtered.slice(0, 15));
+  }
+  return filtered;
+}
+
+function evaluate_move(board, move, isMax) {
   if (move.san.includes("#")) return Infinity;
   if (move.san.includes("=")) return 1000;
 
   let capture = 0;
   if (move.san.includes("x")) capture = evaluate_capture(board, move);
 
-  let isMax = move["color"] == "w";
-
   let from = evaluate_piece(move.piece, move["from"][0], move["from"][1], isMax);
   let to = evaluate_piece(move.piece, move["to"][0], move["to"][1], isMax);
   let position = to - from;
 
   let value = position + capture;
-  return [move.san, value * -1];
+  return [move.san, value];
 }
 
 function evaluate_piece(element, xL, yX, isMax) {
@@ -167,25 +183,8 @@ function evaluate_piece(element, xL, yX, isMax) {
   }
 }
 
-function evaluate_capture(board, move) {
+function evaluate_capture(board, move, isMax) {
   return weights[move["captured"]] - weights[move["piece"]];
-}
-
-function prune(gameState, isMax, doPrint = false) {
-  const flip = isMax ? 1 : -1;
-  const moves = gameState.moves({ verbose: true });
-  let evaluated = [];
-  for (let i = 0; i < moves.length; i++) evaluated.push(evaluate_move(gameState, moves[i]));
-  evaluated.sort((a, b) => (b[1] - a[1]) * flip);
-  // evaluated = evaluated.filter((x) => {
-  //   return x[1] > -10;
-  // });
-  let map = evaluated.map((x) => x[0]);
-  let filtered = map.filter((word) => word);
-  if (doPrint) {
-    console.log(evaluated);
-  }
-  return filtered.slice(0, 15);
 }
 
 // fixes horizon issue
@@ -274,9 +273,9 @@ function quiesce(startingState, maximizingPlayer, alpha, beta, depth) {
 function minimaxAlphaBeta(game, depth, alpha, beta, isMax, sum, isRoot = false) {
   nodesExplored++;
   let moves;
-  if (depth == 3) moves = prune(game, isMax, true);
-  else moves = prune(game, isMax);
-  if (isRoot) moves = ["Qg3"];
+  // if (depth == 3) moves = prune(game, isMax, true);
+  moves = prune(game, isMax);
+  // if (isRoot) moves = ["Qg3"];
   let eval,
     history = [],
     bestMove = null;
