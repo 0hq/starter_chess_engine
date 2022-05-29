@@ -1,4 +1,4 @@
-const DEPTH_SEARCH = 4;
+const DEPTH_SEARCH = 2;
 let startTime = null;
 let nodesExplored = 0;
 let rootHistory = [];
@@ -186,7 +186,7 @@ function prune(gameState, isMax, doPrint = false) {
   if (doPrint) {
     console.log(evaluated);
   }
-  return filtered;
+  return filtered.slice(0, 15);
 }
 
 // fixes horizon issue
@@ -311,8 +311,9 @@ function minimaxAlphaBeta(game, depth, alpha, beta, isMax, sum, isRoot = false) 
       if (eval < beta) beta = eval;
       if (beta <= alpha) break;
       if (isRoot) {
-        console.log("root move done:", evaluation);
-        console.log(moved.san, rHist);
+        console.log(`move: ${moved.san} eval: ${evaluation}`);
+        console.log([moved.san, ...rHist]);
+        console.log("");
         rootHistory.push([moved.san, evaluation]);
       }
     }
