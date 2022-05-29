@@ -30,6 +30,7 @@ function onSnapEnd() {
 
 function onDrop(source, target) {
   // see if the move is legal
+  o(game.fen());
   var move = game.move({
     from: source,
     to: target,
@@ -40,6 +41,7 @@ function onDrop(source, target) {
   if (move === null) return "snapback";
   o(`(${game.fen().split(" ")[5]}) --- Player ---`);
   o(move.san);
+  o("");
 
   // make random legal move for black
   window.setTimeout(makeAIMove, 250);

@@ -1,7 +1,8 @@
-const DEPTH_SEARCH = 4;
+const DEPTH_SEARCH = 3;
 let startTime = null;
 let nodesExplored = 0;
 let rootHistory = [];
+let currentEval = 0;
 // let memo = {};
 
 var weights = { p: 100, n: 280, b: 320, r: 479, q: 929, k: 60000 };
@@ -106,23 +107,23 @@ function evaluate(chess, isMax) {
   nodesExplored = 0;
   let start = new Date();
   startTime = start;
+  currentEval = evaluatePositionState(chess);
 
-  let result = minimaxAlphaBeta(chess, DEPTH_SEARCH, -Infinity, Infinity, isMax, evaluatePositionState(chess), true);
-  console.log(result);
-  rootHistory.sort((a, b) => {
-    return b[1] - a[1];
-  });
-  console.log(rootHistory);
-  // memo = memo[result[0]];
-  // console.log(memo);
-  console.log(chess.fen());
-  // console.log(evaluatePosition(chess));
+  const [move, eval, history] = minimaxAlphaBeta(chess, DEPTH_SEARCH, -Infinity, Infinity, isMax, currentEval, true);
+
+  rootHistory.sort((a, b) => b[1] - a[1]);
+  rootHistory = rootHistory.map((x) => x[0] + ": " + x[1]);
+  let value = ((eval - currentEval) / 100).toFixed(2);
+  let string = value >= 0 ? "+" : "";
+  console.log(`! best move: ${move.san} eval: ${string + value} (${eval}) !`);
+  console.log(`path taken: `, history);
+  console.log(`moves evaluated:`, rootHistory);
 
   let end = new Date();
   console.log(`Time taken in secs: ${(end - start) / 1000}`);
   console.log(`Nodes explored is ${nodesExplored}`);
 
-  return result[0];
+  return move;
 }
 
 d = function (message, depth) {
@@ -312,7 +313,9 @@ function minimaxAlphaBeta(game, depth, alpha, beta, isMax, sum, isRoot = false) 
       if (eval < beta) beta = eval;
       if (beta <= alpha) break;
       if (isRoot) {
-        console.log(`move: ${moved.san} eval: ${evaluation}`);
+        let value = ((evaluation - currentEval) / 100).toFixed(2);
+        let string = value >= 0 ? "+" : "";
+        console.log(`move: ${moved.san} eval: ${string + value} (${evaluation})`);
         console.log([moved.san, ...rHist]);
         console.log("");
         rootHistory.push([moved.san, evaluation]);
