@@ -1,4 +1,4 @@
-const DEPTH_SEARCH = 2;
+const DEPTH_SEARCH = 4;
 let startTime = null;
 let nodesExplored = 0;
 let rootHistory = [];
@@ -153,7 +153,6 @@ function evaluate_move(board, move) {
   let position = to - from;
 
   let value = position + capture;
-  move.score = value;
   return [move.san, value * -1];
 }
 
@@ -274,7 +273,10 @@ function quiesce(startingState, maximizingPlayer, alpha, beta, depth) {
 
 function minimaxAlphaBeta(game, depth, alpha, beta, isMax, sum, isRoot = false) {
   nodesExplored++;
-  const moves = prune(game, isMax);
+  let moves;
+  if (depth == 3) moves = prune(game, isMax, true);
+  else moves = prune(game, isMax);
+  if (isRoot) moves = ["Qg3"];
   let eval,
     history = [],
     bestMove = null;

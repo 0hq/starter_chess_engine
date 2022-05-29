@@ -1,7 +1,7 @@
 // will's chess ai
 // var fen = "rnbqk1nr/p2pppb1/2p3pp/1p2P3/2BP4/5N2/PPP2PPP/RNBQK2R w KQkq - 1 5";
 // var fen = "3b2k1/1p3p2/p1p5/2P4p/1P2P1p1/5p2/5P2/4RK2 w - - 0 1";
-var fen = "rn3rk1/ppp3pp/5q2/2b1pb2/3p4/3PB3/PPP1QPBP/RN2K1NR w - - 0 1";
+var fen = "rn3rk1/ppp3pp/8/2b1pb2/7q/2PPP3/PP2Q1BP/RN2K1NR w - - 1 2";
 var start = fen ? fen : "start";
 var logger = document.getElementById("logger");
 o = function (message) {
