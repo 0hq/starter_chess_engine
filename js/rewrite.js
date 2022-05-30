@@ -1,6 +1,8 @@
-const DEPTH_SEARCH = 3;
+const DEPTH_SEARCH = 2;
+const DO_QUIESCENCE = false;
 let startTime = null;
 let nodesExplored = 0;
+let quiescenceExplored = 0;
 let rootHistory = [];
 let currentEval = 0;
 // let memo = {};
@@ -118,10 +120,12 @@ function evaluate(chess, isMax) {
   console.log(`! best move: ${move.san} eval: ${string + value} (${eval}) !`);
   console.log(`path taken: `, history);
   console.log(`moves evaluated:`, rootHistory);
+  console.log(`zobrist hash: ${zobrist(chess, false)}`);
+  console.log(zobristKeys);
 
   let end = new Date();
   console.log(`Time taken in secs: ${(end - start) / 1000}`);
-  console.log(`Nodes explored is ${nodesExplored}`);
+  console.log(`Nodes explored is ${nodesExplored}, Quiescence nodes: ${quiescenceExplored}`);
 
   return move;
 }
@@ -139,7 +143,72 @@ function sleep(milliseconds) {
   } while (currentDate - date < milliseconds);
 }
 
+// fixed random seed
+var randomState = 1804289383;
+
+// generate 32-bit pseudo legal numbers
+function random() {
+  var number = randomState;
+
+  // 32-bit XOR shift
+  number ^= number << 13;
+  number ^= number >> 17;
+  number ^= number << 5;
+  randomState = number;
+
+  return number;
+}
+
+var zobristKeys = new Array(12 * 64);
+var blackToMove;
+var hashTable = [];
+
+// init random hash keys
+initRandomKeys();
+function initRandomKeys() {
+  console.log("initRandomKeys", zobristKeys);
+  for (var index = 0; index < 12 * 64; index++) zobristKeys[index] = random();
+  blackToMove = random();
+}
+
 // --------------------------- primitive stuff ----------
+
+function zobrist(game, isMax) {
+  const pieces_2d = game.board();
+  let bits = 0;
+  if (!isMax) bits ^= blackToMove;
+  for (let y = 0; y < 8; y++) {
+    for (let x = 0; x < 8; x++) {
+      const position = pieces_2d[y][x];
+      // null if nothing there
+      if (position) {
+        let value = get_zobrist_value(x, y, piece_nums(position.type, position.color));
+        bits ^= value;
+      }
+    }
+  }
+  return bits;
+}
+
+function get_zobrist_value(x, y, piece) {
+  let offset = x + y * 8 + piece * 12;
+  return zobristKeys[offset];
+}
+
+function read_hash(hash, alpha, beta, depth) {
+  let entry = hashTable[hash & 0x7fffffff]; // makes always positive via binary operations
+  if (entry.hash === hash) {
+    // check for conflicts
+    if (entry.depth >= depth) {
+      var flag = entry.flag;
+      var score = entry.score;
+      if (flag == "EXACT") return [score, entry.bestMove];
+      if (flag == "ALPHA" && score <= alpha) return [alpha, entry.bestMove]; // not fully understood yet
+      if (flag == "BETA" && score >= beta) return [beta, entry.bestMove]; // not fully understood yet
+    }
+  }
+  return null;
+}
 
 function prune(gameState, isMax, doPrint = false) {
   const moves = gameState.moves({ verbose: true });
@@ -189,98 +258,70 @@ function evaluate_capture(board, move, isMax) {
 }
 
 // fixes horizon issue
-function quiesce(startingState, maximizingPlayer, alpha, beta, depth) {
+function quiesce(startingState, isMax, alpha, beta, depth, sum) {
   let moves = startingState.moves({ verbose: true });
-  let checkmate = moves.filter((m) => m.includes("#"));
-  let take = moves.filter((m) => m.includes("x"));
-  let promote = moves.filter((m) => m.includes("="));
+  let checkmate = moves.filter((m) => m.san.includes("#"));
+  let take = moves.filter((m) => m.san.includes("x"));
+  let promote = moves.filter((m) => m.san.includes("="));
   moves = [...checkmate, ...take, ...promote];
-  let board_value = evaluatePosition(startingState);
-  if (moves.length == 0) {
-    return [null, board_value, []];
-  } else {
-    // console.log("moves", moves);
-    // console.log(startingState.ascii());
-
-    // console.log("moves and value", moves, board_value);
-
-    // console.log("x".repeat(DEPTH_SEARCH - depth));
-    if (maximizingPlayer) {
-      let maxEval = -Infinity, // minimum value, so that anything will be larger
-        bestMove = null,
-        history = [];
-      for (let index = 0; index < moves.length; index++) {
-        const move = moves[index];
-        startingState.move(move); // simulate the move
-
-        // evaluate the position
-        // console.log("(q) searching down one more with move", move);
-        let [returnedMove, evaluation, returnedHistory] = minimaxAlphaBeta(startingState, depth - 1, null, alpha, beta, false);
-
-        startingState.undo(); // revert the simulated move
-
-        // if this move is better than anything seen before, keep it!
-        if (evaluation > maxEval) {
-          maxEval = evaluation;
-          bestMove = move;
-          history = [move + "(q)", ...returnedHistory];
-        }
-        if (maxEval > alpha) {
-          alpha = maxEval;
-        }
-        if (alpha >= beta) {
-          break;
-        }
+  if (moves.length == 0 || !DO_QUIESCENCE) return [null, sum, []];
+  quiescenceExplored++;
+  let eval,
+    history = [],
+    bestMove = null;
+  // console.log(depth - 1);
+  if (isMax) {
+    eval = -Infinity;
+    for (let i = 0; i < moves.length; i++) {
+      let move = moves[i];
+      let moved = game.move(move, { verbose: true }); // simulate the move
+      var newSum = evaluatePosition(game, moved, sum);
+      let [r, evaluation, rHist] = minimaxAlphaBeta(game, depth - 1, alpha, beta, !isMax, newSum);
+      game.undo(); // revert the simulated move
+      if (evaluation > eval) {
+        eval = evaluation;
+        bestMove = moved;
+        history = [moved.san, ...rHist];
       }
-      // console.log("wrapped one layer (white)", maxEval, bestMove, board_value, history);
-      if (maxEval >= board_value) return [bestMove, maxEval, history];
-      else return [null, board_value, []];
-    } else {
-      // if this is the enemy playing, we're looking to minimize!
-      let minEval = Infinity,
-        bestMove = null,
-        history = []; // maximum value, so that anything will be smaller
-      for (let index = 0; index < moves.length; index++) {
-        const move = moves[index];
-        startingState.move(move); // simulate the move
-
-        // evaluate the position
-        // console.log("(q) searching down one more with move", move);
-        let [returnedMove, evaluation, returnedHistory] = minimaxAlphaBeta(startingState, 0, null, alpha, beta, true);
-
-        startingState.undo(); // revert the simulated move
-
-        // if this move is better than anything seen before, keep it!
-        if (evaluation < minEval) {
-          minEval = evaluation;
-          bestMove = move;
-          history = [move + "(q)", ...returnedHistory];
-        }
-        if (minEval < beta) {
-          beta = minEval;
-        }
-        if (beta <= alpha) {
-          break;
-        }
-      }
-
-      // console.log("wrapped one layer (black)", minEval, bestMove, board_value, history);
-      if (minEval <= board_value) return [bestMove, minEval, history];
-      else return [null, board_value, []];
+      if (eval > alpha) alpha = eval;
+      if (alpha >= beta) break;
     }
+    if (eval >= sum) return [bestMove, eval, history];
+    else return [null, sum, []];
+  } else {
+    eval = Infinity;
+    for (let i = 0; i < moves.length; i++) {
+      let move = moves[i];
+      let moved = game.move(move, { verbose: true });
+      var newSum = evaluatePosition(game, moved, sum);
+
+      let [r, evaluation, rHist] = minimaxAlphaBeta(game, depth - 1, alpha, beta, !isMax, newSum);
+      game.undo();
+      if (evaluation < eval) {
+        eval = evaluation;
+        bestMove = moved;
+        history = [moved.san, ...rHist];
+      }
+      if (eval < beta) beta = eval;
+      if (beta <= alpha) break;
+    }
+    if (eval <= sum) return [bestMove, eval, history];
+    else return [null, sum, []];
   }
 }
 
 function minimaxAlphaBeta(game, depth, alpha, beta, isMax, sum, isRoot = false) {
   nodesExplored++;
   let moves;
+  // if (depth < 0) console.log(depth);
   // if (depth == 3) moves = prune(game, isMax, true);
   moves = prune(game, isMax);
   // if (isRoot) moves = ["Qg3"];
   let eval,
     history = [],
     bestMove = null;
-  if (depth <= 0 || moves.length === 0) return [null, sum, []];
+  // if (depth <= 0 || moves.length === 0) return [null, sum, []];
+  if (depth <= 0 || moves.length === 0) return quiesce(game, isMax, alpha, beta, depth, sum);
   if (isMax) {
     eval = -Infinity;
     for (let i = 0; i < moves.length; i++) {
@@ -478,6 +519,26 @@ function evaluatePositionOld(chess) {
 
 function mobility(chess) {
   return chess.moves().length;
+}
+
+function piece_nums(piece, color) {
+  let offset = color == "w" ? 0 : 6;
+  let value = 0;
+  switch (piece) {
+    case "p":
+      value = 0;
+    case "r":
+      value = 1;
+    case "n":
+      value = 2;
+    case "b":
+      value = 3;
+    case "q":
+      value = 4;
+    case "k":
+      value = 5;
+  }
+  return offset + value;
 }
 
 // function minimaxAlphaBetaOld(startingState, depth, moves, alpha, beta, maximizingPlayer, isRoot = false) {
