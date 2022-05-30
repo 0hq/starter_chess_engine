@@ -1,6 +1,9 @@
 const DEPTH_SEARCH = 3;
-const DO_QUIESCENCE = false;
+const DO_QUIESCENCE = true;
 const USE_HASHING = true;
+const DEPTH_MAX = -5;
+const DO_ITERATIVE_DEEPENING = true;
+const SEARCH_TIME = 10;
 let startTime = null;
 let nodesExplored = 0;
 let quiescenceExplored = 0;
@@ -96,8 +99,7 @@ var pst_b = {
 
 function rewriteEval(chess, isMax = false) {
   o(`(${game.fen().split(" ")[5]}) --- Agent ---`);
-  rootHistory = [];
-  let move = evaluate(chess, isMax);
+  let move = DO_ITERATIVE_DEEPENING ? evaluate_iteratively(chess, isMax) : evaluate(chess, isMax);
   o(move.san);
   o("\n");
   return move;
@@ -108,7 +110,6 @@ function evaluate(chess, isMax) {
   console.log("All moves", prune(chess, false, null, true));
   console.log("");
 
-  nodesExplored = 0;
   let start = new Date();
   startTime = start;
   currentEval = evaluatePositionState(chess);
@@ -127,7 +128,65 @@ function evaluate(chess, isMax) {
   console.log(`Nodes explored is ${nodesExplored}`);
   console.log(`Quiescence nodes: ${quiescenceExplored}`);
   console.log(`hashes used: ${hashCount}`);
-  console.log(`moves evaluated: ${rootHistory}`);
+  console.log(`moves evaluated:`, rootHistory);
+
+  // console.log(`zobrist hash: ${zobrist(chess, false)}`);
+
+  return move;
+}
+
+function evaluate_iteratively(chess, isMax) {
+  let moves = chess.moves();
+  console.log("All moves", prune(chess, false, null, true));
+  console.log("");
+
+  const start = new Date();
+  startTime = start;
+  currentEval = evaluatePositionState(chess);
+
+  let totalNodesExplored = 0;
+  let totalQuiescenceExplored = 0;
+  let totalHashCount = 0;
+
+  let move, eval, history;
+  let depth = 0;
+  while (new Date(start.getTime() + 1000 * SEARCH_TIME) - new Date() > 0) {
+    depth++;
+    rootHistory = [];
+    nodesExplored = 0;
+    quiescenceExplored = 0;
+    hashCount = 0;
+    console.log(`DEPTH SEARCH: ${depth}`);
+    console.log(`time left ${((new Date(start.getTime() + 1000 * SEARCH_TIME) - new Date()) / 1000).toFixed(2)} seconds`);
+
+    [move, eval, history] = minimaxAlphaBetaHashing(chess, depth, -Infinity, Infinity, isMax, null, currentEval, false);
+
+    rootHistory.sort((a, b) => b[1] - a[1]);
+    rootHistory = rootHistory.map((x) => x[0] + ": " + x[1]);
+    let value = ((eval - currentEval) / 100).toFixed(2);
+    let string = value >= 0 ? "+" : "";
+    console.log(`! best move: ${move.san} eval: ${string + value} (${eval}) !`);
+    console.log(`path taken: ${history}`);
+
+    let end = new Date();
+    console.log(`Time taken in secs: ${(end - start) / 1000}`);
+    console.log(`Nodes explored is ${nodesExplored}`);
+    console.log(`Quiescence nodes: ${quiescenceExplored}`);
+    console.log(`hashes used: ${hashCount}`);
+    console.log(`moves evaluated:`, rootHistory);
+    console.log(`time left ${((new Date(start.getTime() + 1000 * SEARCH_TIME) - new Date()) / 1000).toFixed(2)} seconds`);
+    console.log("");
+    console.log("");
+
+    totalNodesExplored += nodesExplored;
+    totalQuiescenceExplored += quiescenceExplored;
+    totalHashCount += hashCount;
+  }
+
+  console.log(`Nodes explored is ${totalNodesExplored}`);
+  console.log(`Quiescence nodes: ${totalQuiescenceExplored}`);
+  console.log(`hashes used: ${totalHashCount}`);
+
   // console.log(`zobrist hash: ${zobrist(chess, false)}`);
 
   return move;
@@ -216,7 +275,7 @@ function read_hash(hash, alpha, beta, depth) {
   return [null, null];
 }
 
-function write_hash(hash, depth, flag, score, bestMove) {
+function write_hash(hash, depth, flag, score, bestMove, moves) {
   if (!hashTable[hash & 0x7fffffff]) hashTable[hash & 0x7fffffff] = {};
   let entry = hashTable[hash & 0x7fffffff];
   entry.hash = hash;
@@ -224,6 +283,7 @@ function write_hash(hash, depth, flag, score, bestMove) {
   entry.flag = flag;
   entry.score = score;
   entry.bestMove = bestMove.san;
+  entry.moves = moves;
 }
 
 function prune(gameState, isMax, hashMove = null, doPrint = false) {
@@ -274,14 +334,20 @@ function evaluate_capture(board, move, isMax) {
   return weights[move["captured"]] - weights[move["piece"]];
 }
 
-// fixes horizon issue
-function quiesce(startingState, isMax, alpha, beta, depth, sum) {
-  let moves = startingState.moves({ verbose: true });
+function get_quiescence_moves(game) {
+  let moves = game.moves({ verbose: true });
   let checkmate = moves.filter((m) => m.san.includes("#"));
   let take = moves.filter((m) => m.san.includes("x"));
   let promote = moves.filter((m) => m.san.includes("="));
-  moves = [...checkmate, ...take, ...promote];
-  if (moves.length == 0 || !DO_QUIESCENCE) return [null, sum, []];
+  return [...checkmate, ...take, ...promote];
+}
+
+// fixes horizon issue
+function quiesce(game, isMax, alpha, beta, depth, sum) {
+  const [score, bestHashMove, hashMoves] = read_hash(zobrist(game, isMax), alpha, beta, depth);
+  if (score) return [bestHashMove, score, [bestHashMove + "-hash"]];
+  const moves = hashMoves?.length ? hashMoves : get_quiescence_moves(game);
+  if (moves.length == 0 || !DO_QUIESCENCE || depth < DEPTH_MAX) return [null, sum, []];
   quiescenceExplored++;
   let eval,
     history = [],
@@ -300,7 +366,10 @@ function quiesce(startingState, isMax, alpha, beta, depth, sum) {
         history = [moved.san + "-q", ...rHist];
       }
       if (eval > alpha) alpha = eval;
-      if (alpha >= beta) break;
+      if (alpha >= beta) {
+        write_hash(zobrist(game, isMax), depth, "ALPHA", alpha, bestMove);
+        break;
+      }
     }
     if (eval >= sum) return [bestMove, eval, history];
     else return [null, sum, []];
@@ -317,8 +386,13 @@ function quiesce(startingState, isMax, alpha, beta, depth, sum) {
         history = [moved.san + "-q", ...rHist];
       }
       if (eval < beta) beta = eval;
-      if (beta <= alpha) break;
+      if (beta <= alpha) {
+        write_hash(zobrist(game, isMax), depth, "BETA", beta, bestMove);
+        break;
+      }
     }
+
+    write_hash(zobrist(game, isMax), depth, "EXACT", eval, bestMove, moves);
     if (eval <= sum) return [bestMove, eval, history];
     else return [null, sum, []];
   }
@@ -326,9 +400,9 @@ function quiesce(startingState, isMax, alpha, beta, depth, sum) {
 
 function minimaxAlphaBetaHashing(game, depth, alpha, beta, isMax, oldMove, oldSum, isRoot = false) {
   nodesExplored++;
-  const [score, bestHashMove] = read_hash(zobrist(game, isMax), alpha, beta, depth);
+  const [score, bestHashMove, hashMoves] = read_hash(zobrist(game, isMax), alpha, beta, depth);
   if (score) return [bestHashMove, score, [bestHashMove + "-hash"]];
-  const moves = prune(game, isMax, bestHashMove);
+  const moves = hashMoves?.length ? hashMoves : prune(game, isMax, bestHashMove);
   const sum = evaluatePosition(game, oldMove, oldSum);
 
   let eval,
@@ -341,6 +415,10 @@ function minimaxAlphaBetaHashing(game, depth, alpha, beta, isMax, oldMove, oldSu
     for (let i = 0; i < moves.length; i++) {
       const move = moves[i];
       const moved = game.move(move, { verbose: true }); // simulate the move
+      if (!moved) {
+        // console.log("ILLEGAL MOVE");
+        continue;
+      }
       let [r, evaluation, rHist] = minimaxAlphaBetaHashing(game, depth - 1, alpha, beta, !isMax, moved, sum);
       game.undo(); // revert the simulated move
       if (evaluation > eval) {
@@ -359,6 +437,10 @@ function minimaxAlphaBetaHashing(game, depth, alpha, beta, isMax, oldMove, oldSu
     for (let i = 0; i < moves.length; i++) {
       const move = moves[i];
       const moved = game.move(move, { verbose: true });
+      if (!moved) {
+        // console.log("ILLEGAL MOVE");
+        continue;
+      }
       let [r, evaluation, rHist] = minimaxAlphaBetaHashing(game, depth - 1, alpha, beta, !isMax, moved, sum);
       game.undo();
       if (evaluation < eval) {
@@ -376,18 +458,20 @@ function minimaxAlphaBetaHashing(game, depth, alpha, beta, isMax, oldMove, oldSu
         let string = value >= 0 ? "+" : "";
         console.log(`move: ${moved.san} eval: ${string + value} (${evaluation})`);
         console.log([moved.san, ...rHist]);
+        console.log(`current node #: ${nodesExplored} hash #: ${hashCount}`);
         console.log("");
         rootHistory.push([moved.san, evaluation]);
       }
     }
   }
-  write_hash(zobrist(game, isMax), depth, "EXACT", eval, bestMove);
+
+  write_hash(zobrist(game, isMax), depth, "EXACT", eval, bestMove, moves);
   return [bestMove, eval, history];
 }
 
 function evaluatePosition(chess, move, score) {
   if (!move) {
-    console.log("WARNING NO MOVE EVALUATION VIA STATE");
+    console.log("EVALUATION VIA STATE");
     return evaluatePositionState(chess);
   }
   let flip, position, positionOpponent;
