@@ -1,9 +1,10 @@
 const DEPTH_SEARCH = 4;
-const DO_QUIESCENCE = false;
+const DO_QUIESCENCE = true;
 const USE_HASHING = true;
 const DEPTH_MAX = -Infinity;
 const DO_ITERATIVE_DEEPENING = true;
-const SEARCH_TIME = 40;
+const STRICT_TIMING = false;
+const SEARCH_TIME = 20;
 let startTime = null;
 let nodesExplored = 0;
 let quiescenceExplored = 0;
@@ -11,6 +12,11 @@ let hashCount = 0;
 let rootHistory = [];
 let currentEval = 0;
 // let memo = {};
+
+// ISSUES
+// Strict timing fucks up evaluation in a weird way
+// Move saving seems to have gone wrong somehow?
+// Weird null evaluation return
 
 var weights = { p: 100, n: 280, b: 320, r: 479, q: 929, k: 60000 };
 var pst_w = {
@@ -355,7 +361,7 @@ function get_quiescence_moves(moves) {
 }
 
 function check_time_over() {
-  if (DO_ITERATIVE_DEEPENING == false) return false;
+  if (DO_ITERATIVE_DEEPENING == false || !STRICT_TIMING) return false;
   return new Date(startTime.getTime() + 1000 * SEARCH_TIME) - new Date() <= 0;
 }
 
@@ -385,7 +391,7 @@ function minimaxAlphaBetaHashing(game, depth, alpha, beta, isMax, oldMove, oldSu
       write_hash(zobrist(game, isMax), depth, "EXACT", sum, oldMove, null);
       return [null, sum, []];
     }
-    return quiesce(game, isMax, alpha, beta, depth, sum, quiescence_moves);
+    return quiesce(game, isMax, alpha, beta, depth, sum, quiescence_moves, oldMove);
   }
 
   let eval,
@@ -466,7 +472,7 @@ function minimaxAlphaBetaHashing(game, depth, alpha, beta, isMax, oldMove, oldSu
 }
 
 // fixes horizon issue
-function quiesce(game, isMax, alpha, beta, depth, sum, moves) {
+function quiesce(game, isMax, alpha, beta, depth, sum, moves, lastMove) {
   quiescenceExplored++;
   let eval,
     history = [],
@@ -513,9 +519,14 @@ function quiesce(game, isMax, alpha, beta, depth, sum, moves) {
       }
     }
 
-    write_hash(zobrist(game, isMax), depth, "EXACT", eval, bestMove, moves);
-    if (eval <= sum) return [bestMove, eval, history];
-    else return [null, sum, []];
+    if (bestMove?.san) {
+      write_hash(zobrist(game, isMax), depth, "EXACT", eval, bestMove, moves);
+      if (eval <= sum) return [bestMove, eval, history];
+      else return [null, sum, []];
+    } else {
+      write_hash(zobrist(game, isMax), depth, "EXACT", sum, lastMove, null);
+      return [null, sum, []];
+    }
   }
 }
 
