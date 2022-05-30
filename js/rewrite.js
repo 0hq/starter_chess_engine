@@ -1,8 +1,10 @@
-const DEPTH_SEARCH = 2;
+const DEPTH_SEARCH = 5;
 const DO_QUIESCENCE = false;
+const USE_HASHING = true;
 let startTime = null;
 let nodesExplored = 0;
 let quiescenceExplored = 0;
+let hashCount = 0;
 let rootHistory = [];
 let currentEval = 0;
 // let memo = {};
@@ -111,21 +113,22 @@ function evaluate(chess, isMax) {
   startTime = start;
   currentEval = evaluatePositionState(chess);
 
-  const [move, eval, history] = minimaxAlphaBeta(chess, DEPTH_SEARCH, -Infinity, Infinity, isMax, currentEval, true);
+  const [move, eval, history] = minimaxAlphaBetaHashing(chess, DEPTH_SEARCH, -Infinity, Infinity, isMax, currentEval, true);
 
   rootHistory.sort((a, b) => b[1] - a[1]);
   rootHistory = rootHistory.map((x) => x[0] + ": " + x[1]);
   let value = ((eval - currentEval) / 100).toFixed(2);
   let string = value >= 0 ? "+" : "";
   console.log(`! best move: ${move.san} eval: ${string + value} (${eval}) !`);
-  console.log(`path taken: `, history);
-  console.log(`moves evaluated:`, rootHistory);
-  console.log(`zobrist hash: ${zobrist(chess, false)}`);
-  console.log(zobristKeys);
+  console.log(`path taken: ${history}`);
 
   let end = new Date();
   console.log(`Time taken in secs: ${(end - start) / 1000}`);
-  console.log(`Nodes explored is ${nodesExplored}, Quiescence nodes: ${quiescenceExplored}`);
+  console.log(`Nodes explored is ${nodesExplored}`);
+  console.log(`Quiescence nodes: ${quiescenceExplored}`);
+  console.log(`hashes used: ${hashCount}`);
+  console.log(`moves evaluated: ${rootHistory}`);
+  // console.log(`zobrist hash: ${zobrist(chess, false)}`);
 
   return move;
 }
@@ -171,6 +174,25 @@ function initRandomKeys() {
   blackToMove = random();
 }
 
+// 16Mb default hash table size
+// var hashEntries = 8388600;
+
+// initHashTable();
+// function initHashTable() {
+//   // loop over TT elements
+//   for (var index = 0; index < hashEntries; index++) {
+//     // reset TT inner fields
+//     hashTable[index] = {
+//       hashKey: 0,
+//       depth: 0,
+//       flag: 0,
+//       score: 0,
+//       bestMove: 0,
+//     };
+//   }
+//   console.log("initHashTable", hashTable);
+// }
+
 // --------------------------- primitive stuff ----------
 
 function zobrist(game, isMax) {
@@ -196,10 +218,12 @@ function get_zobrist_value(x, y, piece) {
 }
 
 function read_hash(hash, alpha, beta, depth) {
-  let entry = hashTable[hash & 0x7fffffff]; // makes always positive via binary operations
-  if (entry.hash === hash) {
+  const entry = hashTable[hash & 0x7fffffff]; // makes always positive via binary operations
+  if (entry?.hash === hash && USE_HASHING) {
     // check for conflicts
     if (entry.depth >= depth) {
+      hashCount++;
+      // console.log(`HASHED AT ${entry.depth} vs ${depth}`);
       var flag = entry.flag;
       var score = entry.score;
       if (flag == "EXACT") return [score, entry.bestMove];
@@ -207,7 +231,17 @@ function read_hash(hash, alpha, beta, depth) {
       if (flag == "BETA" && score >= beta) return [beta, entry.bestMove]; // not fully understood yet
     }
   }
-  return null;
+  return [null, null];
+}
+
+function write_hash(hash, depth, flag, score, bestMove) {
+  if (!hashTable[hash & 0x7fffffff]) hashTable[hash & 0x7fffffff] = {};
+  let entry = hashTable[hash & 0x7fffffff];
+  entry.hash = hash;
+  entry.depth = depth;
+  entry.flag = flag;
+  entry.score = score;
+  entry.bestMove = bestMove;
 }
 
 function prune(gameState, isMax, doPrint = false) {
@@ -276,7 +310,7 @@ function quiesce(startingState, isMax, alpha, beta, depth, sum) {
       let move = moves[i];
       let moved = game.move(move, { verbose: true }); // simulate the move
       var newSum = evaluatePosition(game, moved, sum);
-      let [r, evaluation, rHist] = minimaxAlphaBeta(game, depth - 1, alpha, beta, !isMax, newSum);
+      let [r, evaluation, rHist] = minimaxAlphaBetaHashing(game, depth - 1, alpha, beta, !isMax, newSum);
       game.undo(); // revert the simulated move
       if (evaluation > eval) {
         eval = evaluation;
@@ -295,7 +329,7 @@ function quiesce(startingState, isMax, alpha, beta, depth, sum) {
       let moved = game.move(move, { verbose: true });
       var newSum = evaluatePosition(game, moved, sum);
 
-      let [r, evaluation, rHist] = minimaxAlphaBeta(game, depth - 1, alpha, beta, !isMax, newSum);
+      let [r, evaluation, rHist] = minimaxAlphaBetaHashing(game, depth - 1, alpha, beta, !isMax, newSum);
       game.undo();
       if (evaluation < eval) {
         eval = evaluation;
@@ -310,13 +344,12 @@ function quiesce(startingState, isMax, alpha, beta, depth, sum) {
   }
 }
 
-function minimaxAlphaBeta(game, depth, alpha, beta, isMax, sum, isRoot = false) {
+function minimaxAlphaBetaHashing(game, depth, alpha, beta, isMax, sum, isRoot = false) {
   nodesExplored++;
-  let moves;
-  // if (depth < 0) console.log(depth);
-  // if (depth == 3) moves = prune(game, isMax, true);
-  moves = prune(game, isMax);
-  // if (isRoot) moves = ["Qg3"];
+  const moves = prune(game, isMax);
+  const [score, bestHashMove] = read_hash(zobrist(game, isMax), alpha, beta, depth);
+  if (score) return [bestHashMove, score, ["HASHED"]];
+
   let eval,
     history = [],
     bestMove = null;
@@ -325,10 +358,10 @@ function minimaxAlphaBeta(game, depth, alpha, beta, isMax, sum, isRoot = false) 
   if (isMax) {
     eval = -Infinity;
     for (let i = 0; i < moves.length; i++) {
-      let move = moves[i];
-      let moved = game.move(move, { verbose: true }); // simulate the move
+      const move = moves[i];
+      const moved = game.move(move, { verbose: true }); // simulate the move
       var newSum = evaluatePosition(game, moved, sum);
-      let [r, evaluation, rHist] = minimaxAlphaBeta(game, depth - 1, alpha, beta, !isMax, newSum);
+      let [r, evaluation, rHist] = minimaxAlphaBetaHashing(game, depth - 1, alpha, beta, !isMax, newSum);
       game.undo(); // revert the simulated move
       if (evaluation > eval) {
         eval = evaluation;
@@ -336,15 +369,18 @@ function minimaxAlphaBeta(game, depth, alpha, beta, isMax, sum, isRoot = false) 
         history = [moved.san, ...rHist];
       }
       if (eval > alpha) alpha = eval;
-      if (alpha >= beta) break;
+      if (alpha >= beta) {
+        write_hash(zobrist(game, isMax), depth, "ALPHA", alpha, bestMove);
+        break;
+      }
     }
   } else {
     eval = Infinity;
     for (let i = 0; i < moves.length; i++) {
-      let move = moves[i];
-      let moved = game.move(move, { verbose: true });
+      const move = moves[i];
+      const moved = game.move(move, { verbose: true });
       var newSum = evaluatePosition(game, moved, sum);
-      let [r, evaluation, rHist] = minimaxAlphaBeta(game, depth - 1, alpha, beta, !isMax, newSum);
+      let [r, evaluation, rHist] = minimaxAlphaBetaHashing(game, depth - 1, alpha, beta, !isMax, newSum);
       game.undo();
       if (evaluation < eval) {
         eval = evaluation;
@@ -352,7 +388,10 @@ function minimaxAlphaBeta(game, depth, alpha, beta, isMax, sum, isRoot = false) 
         history = [moved.san, ...rHist];
       }
       if (eval < beta) beta = eval;
-      if (beta <= alpha) break;
+      if (beta <= alpha) {
+        write_hash(zobrist(game, isMax), depth, "BETA", beta, bestMove);
+        break;
+      }
       if (isRoot) {
         let value = ((evaluation - currentEval) / 100).toFixed(2);
         let string = value >= 0 ? "+" : "";
@@ -363,6 +402,7 @@ function minimaxAlphaBeta(game, depth, alpha, beta, isMax, sum, isRoot = false) 
       }
     }
   }
+  write_hash(zobrist(game, isMax), depth, "EXACT", eval, bestMove);
   return [bestMove, eval, history];
 }
 
@@ -615,4 +655,60 @@ function piece_nums(piece, color) {
 //     // console.log([bestMove, minEval, history]);
 //     return [bestMove, minEval, history];
 //   }
+// }
+
+// function minimaxAlphaBeta(game, depth, alpha, beta, isMax, sum, isRoot = false) {
+//   nodesExplored++;
+//   let moves;
+//   // if (depth < 0) console.log(depth);
+//   // if (depth == 3) moves = prune(game, isMax, true);
+//   moves = prune(game, isMax);
+//   // if (isRoot) moves = ["Qg3"];
+//   let eval,
+//     history = [],
+//     bestMove = null;
+//   // if (depth <= 0 || moves.length === 0) return [null, sum, []];
+//   if (depth <= 0 || moves.length === 0) return quiesce(game, isMax, alpha, beta, depth, sum);
+//   if (isMax) {
+//     eval = -Infinity;
+//     for (let i = 0; i < moves.length; i++) {
+//       let move = moves[i];
+//       let moved = game.move(move, { verbose: true }); // simulate the move
+//       var newSum = evaluatePosition(game, moved, sum);
+//       let [r, evaluation, rHist] = minimaxAlphaBeta(game, depth - 1, alpha, beta, !isMax, newSum);
+//       game.undo(); // revert the simulated move
+//       if (evaluation > eval) {
+//         eval = evaluation;
+//         bestMove = moved;
+//         history = [moved.san, ...rHist];
+//       }
+//       if (eval > alpha) alpha = eval;
+//       if (alpha >= beta) break;
+//     }
+//   } else {
+//     eval = Infinity;
+//     for (let i = 0; i < moves.length; i++) {
+//       let move = moves[i];
+//       let moved = game.move(move, { verbose: true });
+//       var newSum = evaluatePosition(game, moved, sum);
+//       let [r, evaluation, rHist] = minimaxAlphaBeta(game, depth - 1, alpha, beta, !isMax, newSum);
+//       game.undo();
+//       if (evaluation < eval) {
+//         eval = evaluation;
+//         bestMove = moved;
+//         history = [moved.san, ...rHist];
+//       }
+//       if (eval < beta) beta = eval;
+//       if (beta <= alpha) break;
+//       if (isRoot) {
+//         let value = ((evaluation - currentEval) / 100).toFixed(2);
+//         let string = value >= 0 ? "+" : "";
+//         console.log(`move: ${moved.san} eval: ${string + value} (${evaluation})`);
+//         console.log([moved.san, ...rHist]);
+//         console.log("");
+//         rootHistory.push([moved.san, evaluation]);
+//       }
+//     }
+//   }
+//   return [bestMove, eval, history];
 // }
