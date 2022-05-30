@@ -5,6 +5,7 @@ const DEPTH_MAX = -Infinity;
 const DO_ITERATIVE_DEEPENING = true;
 const STRICT_TIMING = false;
 const SEARCH_TIME = 20;
+let searchDepthTemp = 0;
 let startTime = null;
 let nodesExplored = 0;
 let quiescenceExplored = 0;
@@ -15,7 +16,8 @@ let currentEval = 0;
 
 // ISSUES
 // Strict timing fucks up evaluation in a weird way
-// Move saving seems to have gone wrong somehow?
+// Move saving seems to have gone wrong somehow? - this is just zobrist keys and en passant
+// Actualy quiescence search is messed up by some move saving - seems to completely misrepresent board. Make hashes save PGN then you can load and check.
 // Weird null evaluation return
 
 var weights = { p: 100, n: 280, b: 320, r: 479, q: 929, k: 60000 };
@@ -160,6 +162,7 @@ function evaluate_iteratively(chess, isMax) {
     depth++;
     rootHistory = [];
     nodesExplored = 0;
+    searchDepthTemp = depth;
     quiescenceExplored = 0;
     hashCount = 0;
     console.log(`DEPTH SEARCH: ${depth}`);
@@ -286,12 +289,14 @@ function prune(game, moves, isMax, doPrint = false) {
     let move = game.move(moves[i], { verbose: true }); // simulate the move
     // console.log(move.san);
     if (!move) {
+      // this is usually an en passant or castling error
       console.log(move, moves[i]);
       console.log("ILLEGAL MOVE");
       console.log(game.ascii());
       console.log(game.moves({ verbose: true }));
-      console.log(game.fen());
-      throw "illegal move";
+      console.log(game.pgn());
+      continue;
+      // throw "illegal move";
     }
     const [score, bestHashMove, moveList] = read_hash(zobrist(game, !isMax), Infinity, -Infinity, -Infinity);
     // if (doPrint) console.log(moves[i].san, score, moveList, bestHashMove, zobrist(game, !isMax));
@@ -374,19 +379,20 @@ function minimaxAlphaBetaHashing(game, depth, alpha, beta, isMax, oldMove, oldSu
   const [score, bestHashMove, hashMoves] = read_hash(zobrist(game, isMax), alpha, beta, depth);
   if (score && bestHashMove) return [bestHashMove, score, [bestHashMove + "-hash"]];
   // if (hashMoves) console.log(san(hashMoves));
-  // const move_gen = hashMoves?.length ? hashMoves : game.moves({ verbose: true });
-  const move_gen = game.moves({ verbose: true });
+  const move_gen = hashMoves?.length ? hashMoves : game.moves({ verbose: true });
+  // const move_gen = game.moves({ verbose: true });
   const moves = prune(game, move_gen, isMax, isRoot);
   const sum = evaluatePosition(game, oldMove, oldSum);
   // if (isRoot) console.log(moves);
   if (check_time_over() && !isRoot) return [null, null, null];
-  if (moves.length === 0 || check_time_over() || (depth <= 0 && !DO_QUIESCENCE) || depth < DEPTH_MAX) {
+  if (moves.length === 0 || check_time_over() || (depth <= 0 && !DO_QUIESCENCE) || depth < searchDepthTemp * -2) {
     // if (depth < 2) console.log(zobrist(game, isMax), depth, "EXACT", sum, oldMove, null);
     write_hash(zobrist(game, isMax), depth, "EXACT", sum, oldMove, null);
     return [null, sum, []];
   }
   if (depth <= 0) {
-    const quiescence_moves = get_quiescence_moves(move_gen);
+    // const quiescence_moves = get_quiescence_moves(move_gen);
+    const quiescence_moves = get_quiescence_moves(game.moves({ verbose: true }));
     if (quiescence_moves.length === 0) {
       write_hash(zobrist(game, isMax), depth, "EXACT", sum, oldMove, null);
       return [null, sum, []];
@@ -407,7 +413,7 @@ function minimaxAlphaBetaHashing(game, depth, alpha, beta, isMax, oldMove, oldSu
         console.log("ILLEGAL MOVE");
         console.log(game.ascii());
         console.log(game.moves({ verbose: true }));
-        console.log(game.fen());
+        console.log(game.pgn());
         throw "illegal move";
       }
       let [r, evaluation, rHist] = minimaxAlphaBetaHashing(game, depth - 1, alpha, beta, !isMax, moved, sum);
@@ -434,7 +440,7 @@ function minimaxAlphaBetaHashing(game, depth, alpha, beta, isMax, oldMove, oldSu
         console.log("ILLEGAL MOVE");
         console.log(game.ascii());
         console.log(game.moves({ verbose: true }));
-        console.log(game.fen());
+        console.log(game.pgn());
         throw "illegal move";
       }
       let [r, evaluation, rHist] = minimaxAlphaBetaHashing(game, depth - 1, alpha, beta, !isMax, moved, sum);
@@ -504,6 +510,14 @@ function quiesce(game, isMax, alpha, beta, depth, sum, moves, lastMove) {
     for (let i = 0; i < moves.length; i++) {
       let move = moves[i];
       let moved = game.move(move, { verbose: true });
+      if (!moved) {
+        console.log(move, moved, moves);
+        console.log("ILLEGAL MOVE");
+        console.log(game.ascii());
+        console.log(game.moves({ verbose: true }));
+        console.log(game.pgn());
+        throw "illegal move";
+      }
       let [r, evaluation, rHist] = minimaxAlphaBetaHashing(game, depth - 1, alpha, beta, !isMax, move, sum);
       game.undo();
       if (evaluation === null) continue;
