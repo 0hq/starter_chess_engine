@@ -4,7 +4,9 @@ const USE_HASHING = true;
 const DEPTH_MAX = -Infinity;
 const DO_ITERATIVE_DEEPENING = true;
 const STRICT_TIMING = false;
-const SEARCH_TIME = 20;
+const SEARCH_TIME = 5;
+const QUIESCENCE_MULTIPLIER = 2;
+const DO_LOGGING = true;
 let searchDepthTemp = 0;
 let startTime = null;
 let nodesExplored = 0;
@@ -14,11 +16,27 @@ let rootHistory = [];
 let currentEval = 0;
 // let memo = {};
 
+var _privateLog = console.log;
+// Redefine console.log method with a custom function
+console.log = function (message) {
+  // Here execute something with the given message or arguments variable
+  if (DO_LOGGING) {
+    var logger = document.getElementById("logger");
+    if (typeof message == "object") {
+      logger.innerHTML += (JSON && JSON.stringify ? JSON.stringify(message) : message) + "<br />";
+    } else {
+      logger.innerHTML += message + "<br />";
+    }
+  }
+  _privateLog.apply(console, arguments);
+};
+
 // ISSUES
 // Strict timing fucks up evaluation in a weird way
 // Move saving seems to have gone wrong somehow? - this is just zobrist keys and en passant
 // Actualy quiescence search is messed up by some move saving - seems to completely misrepresent board. Make hashes save PGN then you can load and check.
 // Weird null evaluation return
+// Seems to be a bug in the way
 
 var weights = { p: 100, n: 280, b: 320, r: 479, q: 929, k: 60000 };
 var pst_w = {
@@ -229,6 +247,20 @@ function initRandomKeys() {
   blackToMove = random();
 }
 
+console.log("");
+console.log(`Settings:`);
+if (DO_ITERATIVE_DEEPENING) {
+  console.log(`Iterative deepening: ${DO_ITERATIVE_DEEPENING}`);
+  console.log(`Strict timing? ${STRICT_TIMING}`);
+  console.log(`Time control: ${SEARCH_TIME} seconds`);
+} else {
+  console.log(`Normal depth search at depth: ${DEPTH_SEARCH}`);
+}
+console.log(`Quiescence search?: ${DO_QUIESCENCE}`);
+console.log(`Max quiescence depth: ${QUIESCENCE_MULTIPLIER}x current depth`);
+console.log(`Use hashing: ${USE_HASHING}`);
+console.log("");
+
 // --------------------------- primitive stuff ----------
 
 function zobrist(game, isMax) {
@@ -385,7 +417,7 @@ function minimaxAlphaBetaHashing(game, depth, alpha, beta, isMax, oldMove, oldSu
   const sum = evaluatePosition(game, oldMove, oldSum);
   // if (isRoot) console.log(moves);
   if (check_time_over() && !isRoot) return [null, null, null];
-  if (moves.length === 0 || check_time_over() || (depth <= 0 && !DO_QUIESCENCE) || depth < searchDepthTemp * -2) {
+  if (moves.length === 0 || check_time_over() || (depth <= 0 && !DO_QUIESCENCE) || depth < searchDepthTemp * -1 * QUIESCENCE_MULTIPLIER) {
     // if (depth < 2) console.log(zobrist(game, isMax), depth, "EXACT", sum, oldMove, null);
     write_hash(zobrist(game, isMax), depth, "EXACT", sum, oldMove, null);
     return [null, sum, []];
@@ -570,11 +602,7 @@ function evaluatePosition(chess, move, score) {
   }
 
   if (game.in_check()) {
-    if (move.color === "w") {
-      score += 50;
-    } else {
-      score -= 50;
-    }
+    score += 50 * flip;
   }
 
   var from = [8 - parseInt(move["from"][1]), move["from"].charCodeAt(0) - "a".charCodeAt(0)];
