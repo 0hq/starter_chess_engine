@@ -1,92 +1,50 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <title>Chess AI</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <meta
-          name="description"           
-          content="A simple chess AI.">
+  <head>
+    <title>Chess AI</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="A simple chess AI." />
 
-        <!-- Bootstrap CSS -->
+    <!-- Bootstrap CSS -->
 
-        <!-- Custom CSS -->
-        <link rel="stylesheet" href="css/main.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/main.css" />
 
-        <!-- Google Icons (Material Design) -->
-        <!-- Font Awesome -->
+    <!-- Google Icons (Material Design) -->
+    <!-- Font Awesome -->
 
-        <!-- jQuery --> 
-        <script
-            src="https://code.jquery.com/jquery-3.5.1.js"
-            integrity="sha256-QWo7LDvxbWT2tbbQ97B53yJnYU3WhH/C8ycbRAkjPDc="
-            crossorigin="anonymous">
-        </script>
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.5.1.js" integrity="sha256-QWo7LDvxbWT2tbbQ97B53yJnYU3WhH/C8ycbRAkjPDc=" crossorigin="anonymous"></script>
 
-        <!-- Chessboard JS -->
-        <link rel="stylesheet"
-            href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css"
-            integrity="sha384-q94+BZtLrkL1/ohfjR8c6L+A6qzNH9R2hBLwyoAfu3i/WCvQjzL2RQJ3uNHDISdU"
-            crossorigin="anonymous">
-        <script defer src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"
-            integrity="sha384-8Vi8VHwn3vjQ9eUHUxex3JSN/NFqUg3QbPyX8kWyb93+8AC/pPWTzj+nHtbC5bxD"
-            crossorigin="anonymous"></script>
+    <!-- Chessboard JS -->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css"
+      integrity="sha384-q94+BZtLrkL1/ohfjR8c6L+A6qzNH9R2hBLwyoAfu3i/WCvQjzL2RQJ3uNHDISdU"
+      crossorigin="anonymous"
+    />
+    <script
+      defer
+      src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"
+      integrity="sha384-8Vi8VHwn3vjQ9eUHUxex3JSN/NFqUg3QbPyX8kWyb93+8AC/pPWTzj+nHtbC5bxD"
+      crossorigin="anonymous"
+    ></script>
 
-        <!-- Chess JS (slightly modified) -->
-        <script defer src="js/chess.js"></script>
-        
-        <!-- <script defer src="js/will.js"></script> -->
-        <script defer src="js/rewrite.js"></script>
+    <!-- Chess JS (slightly modified) -->
+    <script defer src="js/chess.js"></script>
 
-        <!-- Bootstrap JS --> 
-        <script defer
-            src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.bundle.min.js" 
-            integrity="sha384-6khuMg9gaYr5AxOqhkVIODVIvm9ynTT5J4V1cfthmT+emCG6yVmEZsRHdxlotUnm" 
-            crossorigin="anonymous">
-        </script>
+    <!-- Bootstrap JS -->
+    <script
+      defer
+      src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.bundle.min.js"
+      integrity="sha384-6khuMg9gaYr5AxOqhkVIODVIvm9ynTT5J4V1cfthmT+emCG6yVmEZsRHdxlotUnm"
+      crossorigin="anonymous"
+    ></script>
 
-        <!-- Custom JS -->
-        <script defer src="js/main.js"></script>
-    </head>
-    <body>
-        <div id="myBoard" style="width: 400px"></div>
-        <!-- <div id="aiBoard" style="width: 400px; margin-top: 100px;"></div> -->
-        <div style="position: relative; left: 20px; top: 0px;">
-            <h4>Console</h4>
-        
-        <div style="height: 900px; width: 600px; overflow: auto; border: 2px solid grey; padding: 10px;">
-            <p  id="logger"></p>
-        </div>
-    </div>
-        
-        <main>
-            <div class="container my-3">
-                <div class="row align-items-center">
-                    
-                        <!-- <div class="row my-3 text-align-center">
-                            <div class="col-md-12">
-                                <h2>Advantage</h2>
-                                <p><span id="advantageColor">Neither side</span> has the advantage 
-                                    (+<span id="advantageNumber">0</span>).</p>
-                                <div class="progress">
-                                    <div class="progress-bar bg-primary progress-bar-striped progress-bar-animated" 
-                                        role="progressbar" aria-valuenow="0" style="width: 50%"
-                                        aria-valuemin="-2000" aria-valuemax="4000" id='advantageBar'>
-                                    </div>
-                                </div>
-                            </div>
-                        </div> -->
-                        <!-- <div class="row my-3 text-align-center">
-                            <div class="col-md-12">
-                                <h2>Status</h2>
-                                <p><span id="status">No check, checkmate, or draw.</span></p>
-                            </div>
-                        </div> -->
-                    </div>
-                    <div class="col-md-6">
-                        
-                    </div>
-                </div>
-            </div>
-        </main>
-    </body>
+    <!-- Custom JS -->
+    <script defer src="js/main.js"></script>
+  </head>
+  <body>
+    <div id="myBoard" style="width: 400px"></div>
+  </body>
 </html>

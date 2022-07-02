@@ -1,26 +1,34 @@
-// will's chess ai
-// var fen = "rnbqk1nr/p2pppb1/2p3pp/1p2P3/2BP4/5N2/PPP2PPP/RNBQK2R w KQkq - 1 5";
-// var fen = "3b2k1/1p3p2/p1p5/2P4p/1P2P1p1/5p2/5P2/4RK2 w - - 0 1";
-var fen = "rn1r2k1/ppp3pp/8/2b2b2/4P2q/2P1P3/PP1KQ1BP/RN4NR w - - 0 3";
-// var fen = undefined;
-var start = fen ? fen : "start";
-var logger = document.getElementById("logger");
-o = function (message) {
-  console.log(message);
-};
 var board = null;
 var $board = $("#myBoard");
-var game = new Chess(fen);
-// var aiboard = null;
-// var $aiboard = $("#aiBoard");
-
+var game = new Chess(undefined);
 var config = {
   draggable: true,
-  position: start,
+  position: "start",
   onDragStart: onDragStart,
   onDrop: onDrop,
   onSnapEnd: onSnapEnd,
 };
+
+board = Chessboard("myBoard", config);
+
+function makeRandomMove() {
+  // get available moves from chess.js
+  const possibleMoves = game.moves();
+
+  // game over
+  if (possibleMoves.length === 0) return;
+
+  // console.log(possibleMoves);
+
+  // get a random move index
+  const randomIdx = Math.floor(Math.random() * possibleMoves.length);
+
+  // update board state
+  game.move(possibleMoves[randomIdx]);
+
+  // draw
+  board.position(game.fen());
+}
 
 // update the board position after the piece snap
 // for castling, en passant, pawn promotion
@@ -30,7 +38,7 @@ function onSnapEnd() {
 
 function onDrop(source, target) {
   // see if the move is legal
-  o(game.fen());
+  console.log(game.fen());
   var move = game.move({
     from: source,
     to: target,
@@ -39,64 +47,21 @@ function onDrop(source, target) {
 
   // illegal move
   if (move === null) return "snapback";
-  o(`(${game.fen().split(" ")[5]}) --- Player ---`);
-  o(move.san);
-  o("");
+
+  console.log(`(${game.fen().split(" ")[5]}) --- Player ---`);
+  console.log(move.san, "\n");
 
   // make random legal move for black
-  window.setTimeout(makeAIMove, 250);
+  window.setTimeout(makeRandomMove, 250);
 }
 
 function onDragStart(source, piece, position, orientation) {
   // do not pick up pieces if the game is over
   if (game.game_over()) {
-    o(game.pgn());
+    console.log(game.pgn());
     return false;
   }
 
   // only pick up pieces for White
   if (piece.search(/^b/) !== -1) return false;
 }
-
-// aiboard = Chessboard("aiBoard", config);
-board = Chessboard("myBoard", config);
-
-//
-// -------------- actual important stuff below -----
-//
-
-function makeRandomMove() {
-  var possibleMoves = game.moves();
-  console.log(possibleMoves);
-
-  // game over
-  if (possibleMoves.length === 0) return;
-
-  var randomIdx = Math.floor(Math.random() * possibleMoves.length);
-  game.move(possibleMoves[randomIdx]);
-  board.position(game.fen());
-  window.setTimeout(makeAIMove, 500);
-}
-
-function makeAIMove() {
-  game.move(rewriteEval(game, false));
-  board.position(game.fen());
-  // window.setTimeout(makeRandomMove, 500);
-}
-
-// function makeOtherAIMove() {
-//   game.move(game.moves()[Math.floor(Math.random() * game.moves().length)]);
-// }
-
-// function makeAIsPlay(isMax) {
-//   if (isMax) makeAIMove();
-//   else makeOtherAIMove();
-// }
-
-// board.position(game.fen());
-// window.setTimeout(makeRandomMove, 500);
-
-// function makeAIMoveOld() {
-//   game.move(evalMove(game, false));
-//   board.position(game.fen());
-// }
