@@ -1,72 +1,27 @@
 var board = null;
-var $board = $("#myBoard");
-var game = new Chess(undefined);
-var config = {
-  draggable: true,
-  position: "start",
-  // onDragStart: onDragStart,
-  // onDrop: onDrop,
-  // onSnapEnd: onSnapEnd,
-};
-
-board = Chessboard("myBoard", config);
-
-makeRandomMove();
+var game = new Chess();
 
 function makeRandomMove() {
-  // get available moves from chess.js
-  const possibleMoves = game.moves();
+  // chess.js gives us all the possible moves in an array
+  // [ move1, move2, move3 ... ]
+  var possibleMoves = game.moves();
 
-  // game over
-  if (possibleMoves.length === 0) return;
+  // exit if the game is over
+  if (game.game_over()) return;
 
-  // console.log(possibleMoves);
+  // choses a random index in the list
+  var randomIdx = Math.floor(Math.random() * possibleMoves.length);
 
-  // get a random move index
-  const randomIdx = Math.floor(Math.random() * possibleMoves.length);
-
-  // update board state
+  // updates javascript board state
   game.move(possibleMoves[randomIdx]);
 
-  // draw
+  // changes html board state
   board.position(game.fen());
 
-  // make another random move, wait 3 seconds
+  // call this function again in 5 secs
   window.setTimeout(makeRandomMove, 500);
 }
 
-// // update the board position after the piece snap
-// // for castling, en passant, pawn promotion
-// function onSnapEnd() {
-//   board.position(game.fen());
-// }
+board = Chessboard("myBoard", "start");
 
-// function onDrop(source, target) {
-//   // see if the move is legal
-//   console.log(game.fen());
-//   var move = game.move({
-//     from: source,
-//     to: target,
-//     promotion: "q", // NOTE: always promote to a queen for example simplicity
-//   });
-
-//   // illegal move
-//   if (move === null) return "snapback";
-
-//   console.log(`(${game.fen().split(" ")[5]}) --- Player ---`);
-//   console.log(move.san, "\n");
-
-//   // make random legal move for black
-//   window.setTimeout(makeRandomMove, 250);
-// }
-
-// function onDragStart(source, piece, position, orientation) {
-//   // do not pick up pieces if the game is over
-//   if (game.game_over()) {
-//     console.log(game.pgn());
-//     return false;
-//   }
-
-//   // only pick up pieces for White
-//   if (piece.search(/^b/) !== -1) return false;
-// }
+window.setTimeout(makeRandomMove, 500);
