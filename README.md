@@ -8,8 +8,8 @@ https://github.com/jhlywa/chess.js/blob/master/README.md
 Chessboard.js:
 https://chessboardjs.com/  
 
-Branch main: Random vs Random
-Branch player vs random: Player vs Random
+Branch main: Random vs Random.  
+Branch player vs random: Player vs Random.  
 
-Try it here:  
-https://0hq.github.io/starter_chess_engine/
+Try it here:   
+https://0hq.github.io/starter_chess_engine/  
