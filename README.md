@@ -1,25 +1,15 @@
-# js chess bot
+# Starter code for Chess.js and Chessboard.js 
 
-this is the old js version i built, now ported to Golang for concurrency and speed: https://github.com/0hq/chess-engine-golang    
+Integrates Chess.js and Chessboard.js into an HTML page.  
 
-logic files held in js/rewrite.js and the version i wrote in 4 hours for a competition is js/will.js
+Chess.js:   
+https://github.com/jhlywa/chess.js/blob/master/README.md   
 
-Quiescence search has been removed temporarily so it kind of sucks.
+Chessboard.js:
+https://chessboardjs.com/  
 
-- [x] Depth-first search.  
-- [x] Alpha/beta pruning.  
-- [x] Move ordering.  
-- [x] Piece position evaluation.  
-- [x] Iterative Deepening.  
-- [x] Memoization / Transposition Tables.  
+Branch main: Random vs Random
+Branch player vs random: Player vs Random
 
-- [ ] Parallelization   
-- [ ] Monte Carlo Tree Search?  
-- [ ] MTD(f) or PVS search style?  
-- [ ] Fix weird illegal move issue
-- [ ] Move storage
-- [ ] Better move ordering
-- [ ] Razoring?
-
-want to test it out?  
-https://0hq.github.io/chess-ai/  
+Try it here:  
+https://0hq.github.io/starter_chess_engine/
