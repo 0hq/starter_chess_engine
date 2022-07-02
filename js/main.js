@@ -4,12 +4,14 @@ var game = new Chess(undefined);
 var config = {
   draggable: true,
   position: "start",
-  onDragStart: onDragStart,
-  onDrop: onDrop,
-  onSnapEnd: onSnapEnd,
+  // onDragStart: onDragStart,
+  // onDrop: onDrop,
+  // onSnapEnd: onSnapEnd,
 };
 
 board = Chessboard("myBoard", config);
+
+makeRandomMove();
 
 function makeRandomMove() {
   // get available moves from chess.js
@@ -28,40 +30,43 @@ function makeRandomMove() {
 
   // draw
   board.position(game.fen());
+
+  // make another random move, wait 3 seconds
+  window.setTimeout(makeRandomMove, 500);
 }
 
-// update the board position after the piece snap
-// for castling, en passant, pawn promotion
-function onSnapEnd() {
-  board.position(game.fen());
-}
+// // update the board position after the piece snap
+// // for castling, en passant, pawn promotion
+// function onSnapEnd() {
+//   board.position(game.fen());
+// }
 
-function onDrop(source, target) {
-  // see if the move is legal
-  console.log(game.fen());
-  var move = game.move({
-    from: source,
-    to: target,
-    promotion: "q", // NOTE: always promote to a queen for example simplicity
-  });
+// function onDrop(source, target) {
+//   // see if the move is legal
+//   console.log(game.fen());
+//   var move = game.move({
+//     from: source,
+//     to: target,
+//     promotion: "q", // NOTE: always promote to a queen for example simplicity
+//   });
 
-  // illegal move
-  if (move === null) return "snapback";
+//   // illegal move
+//   if (move === null) return "snapback";
 
-  console.log(`(${game.fen().split(" ")[5]}) --- Player ---`);
-  console.log(move.san, "\n");
+//   console.log(`(${game.fen().split(" ")[5]}) --- Player ---`);
+//   console.log(move.san, "\n");
 
-  // make random legal move for black
-  window.setTimeout(makeRandomMove, 250);
-}
+//   // make random legal move for black
+//   window.setTimeout(makeRandomMove, 250);
+// }
 
-function onDragStart(source, piece, position, orientation) {
-  // do not pick up pieces if the game is over
-  if (game.game_over()) {
-    console.log(game.pgn());
-    return false;
-  }
+// function onDragStart(source, piece, position, orientation) {
+//   // do not pick up pieces if the game is over
+//   if (game.game_over()) {
+//     console.log(game.pgn());
+//     return false;
+//   }
 
-  // only pick up pieces for White
-  if (piece.search(/^b/) !== -1) return false;
-}
+//   // only pick up pieces for White
+//   if (piece.search(/^b/) !== -1) return false;
+// }
