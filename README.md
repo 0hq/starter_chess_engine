@@ -13,7 +13,7 @@ https://0hq.github.io/starter_chess_engine/
 Instructions for use:
 
 Download the repo.  
-Open index.html in a browser. 
+Open index.html in a browser.   
 Live Server extension in VSCode reccomended.   
   
 ---
