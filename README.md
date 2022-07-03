@@ -18,8 +18,6 @@ Instructions for use:
   
 ---
 
-Chess.js:   
-https://github.com/jhlywa/chess.js/blob/master/README.md   
+Chess.js: https://github.com/jhlywa/chess.js/blob/master/README.md   
 
-Chessboard.js:
-https://chessboardjs.com/  
+Chessboard.js: https://chessboardjs.com/  
