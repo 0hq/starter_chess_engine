@@ -2,8 +2,8 @@
 
 Integrates Chess.js and Chessboard.js into an HTML page.  
 
-Branch main: Random vs Random.  
-Branch player vs random: Player vs Random.  
+**Branch main:** Random vs Random.  
+**Branch player vs random:** Player vs Random.  
 
 Try it here:   
 https://0hq.github.io/starter_chess_engine/ 
@@ -12,9 +12,9 @@ https://0hq.github.io/starter_chess_engine/
 
 Instructions for use:
 
-Download the repo.  
-Open index.html in a browser.   
-Live Server extension in VSCode reccomended.   
+- Download the repo.  
+- Open index.html in a browser.   
+- Live Server extension in VSCode reccomended.   
   
 ---
 
